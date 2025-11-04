@@ -133,6 +133,64 @@ export const LineNotifySettings = ({ darkMode, teamMembers, projects, routineTas
     }, 5000);
   };
 
+  // 手動で日報送信
+  const handleManualSend = async () => {
+    if (!settings.channelAccessToken.trim()) {
+      setMessage({ type: 'error', text: 'Channel Access Tokenを入力してください' });
+      return;
+    }
+
+    if (!settings.groupId.trim()) {
+      setMessage({ type: 'error', text: 'Group IDを入力してください' });
+      return;
+    }
+
+    if (settings.selectedMembers.length === 0) {
+      setMessage({ type: 'error', text: '送信対象のメンバーを選択してください' });
+      return;
+    }
+
+    setIsTesting(true);
+    setMessage({ type: '', text: '' });
+
+    // 日報を生成
+    const { generateTeamReport, sendLineMessage } = await import('../../utils/lineMessagingApiUtils');
+    const report = generateTeamReport(
+      settings.selectedMembers,
+      projects,
+      routineTasks,
+      null // 今日の日付
+    );
+
+    // LINE Messaging APIで送信
+    const result = await sendLineMessage(settings.channelAccessToken, settings.groupId, report);
+
+    if (result.success) {
+      setMessage({ type: 'success', text: '日報を送信しました！LINEグループを確認してください。' });
+
+      // 最終送信日時を更新
+      const now = new Date();
+      const dateTimeString = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+      const updatedSettings = {
+        ...settings,
+        lastSentDate: now.toISOString().split('T')[0],
+        lastSentDateTime: dateTimeString
+      };
+      saveLineSettings(updatedSettings);
+      setSettings(updatedSettings);
+    } else {
+      setMessage({ type: 'error', text: `日報送信に失敗しました: ${result.error}` });
+    }
+
+    setIsTesting(false);
+
+    // 5秒後にメッセージを消す
+    setTimeout(() => {
+      setMessage({ type: '', text: '' });
+    }, 5000);
+  };
+
   return (
     <div className="space-y-6">
       {/* ヘッダー */}
@@ -325,34 +383,53 @@ export const LineNotifySettings = ({ darkMode, teamMembers, projects, routineTas
       </div>
 
       {/* アクションボタン */}
-      <div className="flex gap-3">
+      <div className="space-y-3">
+        <div className="flex gap-3">
+          <button
+            onClick={handleTest}
+            disabled={isTesting || !settings.channelAccessToken || !settings.groupId}
+            className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 ${
+              darkMode
+                ? 'border-green-500 text-green-400 hover:bg-green-500 hover:bg-opacity-10'
+                : 'border-green-500 text-green-600 hover:bg-green-50'
+            } font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            <Send size={20} />
+            {isTesting ? '送信中...' : 'テスト送信'}
+          </button>
+
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Check size={20} />
+            {isSaving ? '保存中...' : '設定を保存'}
+          </button>
+        </div>
+
+        {/* 手動で日報送信ボタン */}
         <button
-          onClick={handleTest}
-          disabled={isTesting || !settings.channelAccessToken || !settings.groupId}
-          className={`flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 ${
+          onClick={handleManualSend}
+          disabled={isTesting || !settings.channelAccessToken || !settings.groupId || settings.selectedMembers.length === 0}
+          className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 ${
             darkMode
-              ? 'border-green-500 text-green-400 hover:bg-green-500 hover:bg-opacity-10'
-              : 'border-green-500 text-green-600 hover:bg-green-50'
+              ? 'border-blue-500 text-blue-400 hover:bg-blue-500 hover:bg-opacity-10'
+              : 'border-blue-500 text-blue-600 hover:bg-blue-50'
           } font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
         >
           <Send size={20} />
-          {isTesting ? '送信中...' : 'テスト送信'}
+          {isTesting ? '送信中...' : '今すぐ日報を送信'}
         </button>
-
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Check size={20} />
-          {isSaving ? '保存中...' : '設定を保存'}
-        </button>
+        <p className={`text-xs ${textSecondary} text-center`}>
+          選択したメンバーの日報を今すぐLINEに送信します
+        </p>
       </div>
 
       {/* 最終送信日時 */}
-      {settings.lastSentDate && (
+      {(settings.lastSentDateTime || settings.lastSentDate) && (
         <div className={`text-sm ${textSecondary} text-center`}>
-          最終送信: {settings.lastSentDate}
+          最終送信: {settings.lastSentDateTime || settings.lastSentDate}
         </div>
       )}
     </div>

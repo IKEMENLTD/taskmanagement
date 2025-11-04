@@ -63,9 +63,13 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
           console.log('LINE Messaging API: 日報送信成功');
 
           // 最終送信日時を更新
+          const now = new Date();
+          const dateTimeString = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
           const updatedSettings = {
             ...settings,
-            lastSentDate: new Date().toISOString().split('T')[0]
+            lastSentDate: now.toISOString().split('T')[0],
+            lastSentDateTime: dateTimeString
           };
           saveLineSettings(updatedSettings);
         } else {
