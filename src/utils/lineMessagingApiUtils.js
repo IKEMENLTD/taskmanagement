@@ -88,56 +88,56 @@ export const generateMemberReport = (member, projects, routineTasks, date) => {
     ? Math.round((completedRoutines.length / memberRoutines.length) * 100)
     : 0;
 
+  // タスクが全くない場合は簡潔に表示
+  if (memberTasks.length === 0 && memberRoutines.length === 0) {
+    return `\n【${member}さん】\n担当タスクなし\n`;
+  }
+
   // レポート生成
-  let report = `\n━━━━━━━━━━━━━━━━\n`;
-  report += `📊 ${member}さんの進捗報告\n`;
-  report += `📅 ${todayStr}\n`;
-  report += `━━━━━━━━━━━━━━━━\n\n`;
+  let report = `\n【${member}さん】\n`;
 
   // 完了したタスク
   if (completedTasks.length > 0) {
-    report += `✅ 本日完了したタスク (${completedTasks.length}件)\n`;
+    report += `✅ 本日完了 (${completedTasks.length}件)\n`;
     completedTasks.forEach((task, index) => {
       report += `${index + 1}. ${task.name}\n`;
-      report += `   └ ${task.projectName}\n`;
+      report += `  ${task.projectName}\n`;
     });
-    report += `\n`;
   }
 
   // 進行中のタスク
   if (activeTasks.length > 0) {
-    report += `🔄 進行中のタスク (${activeTasks.length}件)\n`;
-    activeTasks.slice(0, 5).forEach((task, index) => {
+    report += `\n🔄 進行中 (${activeTasks.length}件)\n`;
+    activeTasks.slice(0, 3).forEach((task, index) => {
       const priority = task.priority === 'urgent' ? '🔴' :
                        task.priority === 'high' ? '🟠' :
                        task.priority === 'medium' ? '🟡' : '🟢';
       report += `${index + 1}. ${priority} ${task.name}\n`;
-      report += `   └ ${task.projectName} (進捗: ${task.progress}%)\n`;
+      report += `  ${task.projectName} (${task.progress}%)`;
       if (task.dueDate) {
-        report += `   └ 期限: ${task.dueDate}\n`;
+        report += ` 期限:${task.dueDate}`;
       }
+      report += `\n`;
     });
-    if (activeTasks.length > 5) {
-      report += `   ... 他${activeTasks.length - 5}件\n`;
+    if (activeTasks.length > 3) {
+      report += `  ...他${activeTasks.length - 3}件\n`;
     }
-    report += `\n`;
   }
 
   // ブロック中のタスク
   if (blockedTasks.length > 0) {
-    report += `⚠️ ブロック中のタスク (${blockedTasks.length}件)\n`;
+    report += `\n⚠️ ブロック中 (${blockedTasks.length}件)\n`;
     blockedTasks.forEach((task, index) => {
       report += `${index + 1}. ${task.name}\n`;
-      report += `   └ ${task.projectName}\n`;
+      report += `  ${task.projectName}\n`;
     });
-    report += `\n`;
   }
 
   // ルーティン達成率
   if (memberRoutines.length > 0) {
     const emoji = routineRate >= 80 ? '🎉' : routineRate >= 50 ? '👍' : '💪';
-    report += `${emoji} ルーティン達成率: ${routineRate}%\n`;
-    report += `   完了: ${completedRoutines.length}/${memberRoutines.length}件\n\n`;
+    report += `\n${emoji} ルーティン達成率: ${routineRate}%`;
+    report += ` (${completedRoutines.length}/${memberRoutines.length}件)\n`;
   }
 
   // サマリー
@@ -146,15 +146,13 @@ export const generateMemberReport = (member, projects, routineTasks, date) => {
     ? Math.round((completedTasks.length / totalTasks) * 100)
     : 0;
 
-  report += `━━━━━━━━━━━━━━━━\n`;
-  report += `📈 サマリー\n`;
-  report += `・タスク総数: ${totalTasks}件\n`;
-  report += `・本日完了: ${completedTasks.length}件\n`;
-  report += `・進行中: ${activeTasks.length}件\n`;
+  report += `\n📈 サマリー\n`;
+  report += `タスク総数: ${totalTasks}件\n`;
+  report += `本日完了: ${completedTasks.length}件 | 進行中: ${activeTasks.length}件`;
   if (blockedTasks.length > 0) {
-    report += `・ブロック中: ${blockedTasks.length}件\n`;
+    report += ` | ブロック: ${blockedTasks.length}件`;
   }
-  report += `━━━━━━━━━━━━━━━━\n`;
+  report += `\n`;
 
   return report;
 };
@@ -165,23 +163,24 @@ export const generateMemberReport = (member, projects, routineTasks, date) => {
 export const generateTeamReport = (selectedMembers, projects, routineTasks, date) => {
   const dateStr = date || new Date().toISOString().split('T')[0];
   const today = new Date(dateStr);
-  const todayStr = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+  const todayStr = `${today.getFullYear()}/${today.getMonth() + 1}/${today.getDate()}`;
 
-  let report = `\n╔════════════════════╗\n`;
-  report += `║  📊 日報 - ${todayStr}  ║\n`;
-  report += `╚════════════════════╝\n`;
+  let report = `📊 日報 ${todayStr}\n`;
+  report += `━━━━━━━━━━━\n`;
 
   // 各メンバーのレポートを追加
   selectedMembers.forEach((member, index) => {
     report += generateMemberReport(member, projects, routineTasks, dateStr);
     if (index < selectedMembers.length - 1) {
-      report += `\n`;
+      report += `\n━━━━━━━━━━━\n`;
     }
   });
 
   // フッター
-  report += `\n🤖 4次元プロジェクト管理システム\n`;
-  report += `自動送信時刻: ${new Date().toLocaleTimeString('ja-JP')}\n`;
+  const now = new Date();
+  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  report += `\n━━━━━━━━━━━\n`;
+  report += `🤖 4次元PM | ${timeStr}\n`;
 
   return report;
 };
