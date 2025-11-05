@@ -3,6 +3,7 @@ import { Users, Plus, X, Edit, Trash2 } from 'lucide-react';
 import { MemberCard } from '../cards/MemberCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { canAddMember, canDeleteMember } from '../../utils/permissionUtils';
+import { createTeamMember, updateTeamMember, deleteTeamMember } from '../../utils/teamMemberUtils';
 
 /**
  * チームビューコンポーネント
@@ -148,7 +149,7 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
   };
 
   // 保存
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim() || !formData.role.trim()) {
       alert('必須項目を入力してください。');
       return;
@@ -174,8 +175,22 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
         return;
       }
 
+      // Supabaseを更新
+      const { data, error } = await updateTeamMember(editingMember.id, {
+        name: trimmedName,
+        role: formData.role.trim(),
+        avatar: formData.avatar || null
+      });
+
+      if (error) {
+        console.error('チームメンバー更新エラー:', error);
+        alert('メンバーの更新に失敗しました');
+        return;
+      }
+
+      // ローカルステートを更新
       const updatedMembers = teamMembers.map(m =>
-        m.name === editingMember.name
+        m.id === editingMember.id
           ? {
               ...m,
               ...formData,
@@ -195,7 +210,22 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
         return;
       }
 
+      // Supabaseに保存
+      const { data, error } = await createTeamMember({
+        name: trimmedName,
+        role: formData.role.trim(),
+        avatar: formData.avatar || null
+      });
+
+      if (error) {
+        console.error('チームメンバー作成エラー:', error);
+        alert('メンバーの追加に失敗しました');
+        return;
+      }
+
+      // ローカルステートを更新
       const newMember = {
+        ...data,
         ...formData,
         name: trimmedName,
         role: formData.role.trim(),
@@ -237,7 +267,10 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
   };
 
   // 削除
-  const handleDelete = (memberName) => {
+  const handleDelete = async (memberName) => {
+    const member = teamMembers.find(m => m.name === memberName);
+    if (!member) return;
+
     const { assignedTasks, assignedRoutines } = checkMemberAssignments(memberName);
     const taskCount = assignedTasks.length;
     const routineCount = assignedRoutines.length;
@@ -276,6 +309,16 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
       if (!window.confirm('このメンバーを削除しますか？')) return;
     }
 
+    // Supabaseから削除
+    const { error } = await deleteTeamMember(member.id);
+
+    if (error) {
+      console.error('チームメンバー削除エラー:', error);
+      alert('メンバーの削除に失敗しました');
+      return;
+    }
+
+    // ローカルステートを更新
     setTeamMembers(teamMembers.filter(m => m.name !== memberName));
     closeDetailModal();
   };
