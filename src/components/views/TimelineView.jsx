@@ -649,14 +649,18 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                 )}
               </div>
               <div className={`text-xs ${textSecondary} mt-1 flex items-center gap-3`}>
-                <span className="flex items-center gap-1">
-                  <Users size={12} />
-                  {project.team.join(', ')}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar size={12} />
-                  {project.timeline.end}まで
-                </span>
+                {project.team && project.team.length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Users size={12} />
+                    {Array.isArray(project.team) ? project.team.join(', ') : project.team}
+                  </span>
+                )}
+                {project.timeline_end && (
+                  <span className="flex items-center gap-1">
+                    <Calendar size={12} />
+                    {project.timeline_end}まで
+                  </span>
+                )}
               </div>
             </div>
             <div
