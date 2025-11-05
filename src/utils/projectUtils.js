@@ -205,6 +205,12 @@ export const updateTask = async (taskId, updates) => {
       updated_at: new Date().toISOString()
     };
 
+    // データベースに存在しないフィールドを削除
+    delete updateData.projectName;
+    delete updateData.tasks;
+    delete updateData.created_at;
+    delete updateData.id;
+
     // キャメルケースをスネークケースに変換
     if (updates.projectId !== undefined) {
       updateData.project_id = updates.projectId;
