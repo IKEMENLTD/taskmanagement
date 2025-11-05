@@ -206,6 +206,10 @@ export const updateTask = async (taskId, updates) => {
     };
 
     // キャメルケースをスネークケースに変換
+    if (updates.projectId !== undefined) {
+      updateData.project_id = updates.projectId;
+      delete updateData.projectId;
+    }
     if (updates.startDate !== undefined) {
       updateData.start_date = updates.startDate;
       delete updateData.startDate;
