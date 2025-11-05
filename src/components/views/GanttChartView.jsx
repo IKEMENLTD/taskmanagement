@@ -212,10 +212,10 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
           <div style={{ minWidth: '800px' }}>
             {/* タイムラインヘッダー */}
             <div className={`border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} sticky top-0 ${cardBg} z-10`}>
-              <div className="flex">
+              <div className="flex" style={{ height: '36px' }}>
                 {/* プロジェクト名列 */}
-                <div className={`w-64 p-4 border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} font-semibold ${textColor}`}>
-                  プロジェクト / タスク
+                <div className={`w-64 py-2 px-3 border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} font-semibold ${textColor} text-sm flex items-center`} style={{ height: '36px', minWidth: '256px', maxWidth: '256px' }}>
+                  {/* ヘッダーテキストを削除してシンプルに */}
                 </div>
 
                 {/* 日付列 */}
@@ -223,10 +223,10 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                   {dateRange.map((date, index) => (
                     <div
                       key={index}
-                      className={`flex-1 p-2 text-center text-xs border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${
+                      className={`flex-1 py-2 px-1 text-center text-xs border-r flex items-center justify-center ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${
                         isToday(date) ? 'bg-blue-100 dark:bg-blue-900/30' : ''
                       } ${isWeekend(date) ? (darkMode ? 'bg-gray-700' : 'bg-gray-50') : ''} ${textSecondary}`}
-                      style={{ minWidth: '40px' }}
+                      style={{ minWidth: '40px', height: '36px' }}
                     >
                       {formatDateForGantt(date, viewMode)}
                     </div>
@@ -240,21 +240,21 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
               {filteredData.map((project, projectIndex) => (
                 <div key={project.id} className={`border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                   {/* プロジェクト行 */}
-                  <div className="flex items-center hover:bg-opacity-50 transition-colors">
-                    <div className={`w-64 p-4 border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${textColor} font-semibold`}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: project.color }}
-                        ></div>
-                        {project.name}
-                      </div>
-                      <div className={`text-xs ${textSecondary} mt-1`}>
-                        {project.progress}% 完了
+                  <div className="flex items-center hover:bg-opacity-50 transition-colors" style={{ height: '45px' }}>
+                    <div className={`border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${textColor} font-semibold flex items-center gap-2 px-2`} style={{ height: '45px', minWidth: '256px', maxWidth: '256px', width: '256px' }}>
+                      <div
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: project.color }}
+                      ></div>
+                      <div className="flex-1 overflow-hidden">
+                        <div className="text-sm truncate">{project.name}</div>
+                        <div className={`text-xs ${textSecondary} truncate`}>
+                          {project.progress}%
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex-1 relative" style={{ height: '60px' }}>
+                    <div className="flex-1 relative" style={{ height: '45px' }}>
                       {/* 今日のライン */}
                       {todayPosition !== null && (
                         <div
@@ -274,7 +274,7 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
 
                         return (
                           <div
-                            className="absolute top-1/2 transform -translate-y-1/2 h-8 rounded flex items-center justify-center text-white text-xs font-semibold shadow-lg"
+                            className="absolute top-1/2 transform -translate-y-1/2 h-6 rounded flex items-center justify-center text-white text-xs font-semibold shadow-lg"
                             style={{
                               left: `${position.left}%`,
                               width: `${position.width}%`,
@@ -294,16 +294,19 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                     <div
                       key={task.id}
                       className={`flex items-center hover:${darkMode ? 'bg-gray-700' : 'bg-gray-50'} transition-colors cursor-pointer`}
+                      style={{ height: '38px' }}
                       onClick={() => onTaskClick({ ...task, projectName: project.name, projectId: project.id })}
                     >
-                      <div className={`w-64 p-3 pl-8 border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${textColor} text-sm`}>
-                        <div className="truncate">{task.name}</div>
-                        <div className={`text-xs ${textSecondary} mt-1`}>
-                          {task.assignee}
+                      <div className={`border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${textColor} flex items-center pl-6 pr-2`} style={{ height: '38px', minWidth: '256px', maxWidth: '256px', width: '256px' }}>
+                        <div className="flex-1 overflow-hidden min-w-0">
+                          <div className="text-sm truncate leading-tight">{task.name}</div>
+                          <div className={`text-xs ${textSecondary} truncate leading-tight`}>
+                            {task.assignee}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex-1 relative" style={{ height: '50px' }}>
+                      <div className="flex-1 relative" style={{ height: '38px' }}>
                         {/* 今日のライン */}
                         {todayPosition !== null && (
                           <div
@@ -319,7 +322,7 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
 
                           return (
                             <div
-                              className="absolute top-1/2 transform -translate-y-1/2 h-6 rounded flex items-center justify-between px-2 text-white text-xs shadow"
+                              className="absolute top-1/2 transform -translate-y-1/2 h-5 rounded flex items-center justify-between px-2 text-white text-xs shadow"
                               style={{
                                 left: `${position.left}%`,
                                 width: `${position.width}%`,
@@ -329,7 +332,7 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                             >
                               {position.width > 15 && (
                                 <>
-                                  <span>{task.progress}%</span>
+                                  <span className="text-xs">{task.progress}%</span>
                                   {delayed && <span className="text-xs">⚠️</span>}
                                 </>
                               )}
@@ -352,10 +355,10 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
               {showDependencies && (() => {
                 const allTasks = getAllTasksFromProjects(projects);
                 const arrows = [];
-                let currentY = 60; // プロジェクト行の高さ
+                let currentY = 45; // プロジェクト行の高さ
 
                 filteredData.forEach((project) => {
-                  currentY += 60; // プロジェクト行をスキップ
+                  currentY += 45; // プロジェクト行をスキップ
 
                   project.tasks.forEach((task, taskIndex) => {
                     if (task.dependencies && task.dependencies.length > 0) {
@@ -363,12 +366,12 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                         const depTask = allTasks.find(t => t.id === depId);
                         if (depTask) {
                           // 依存元タスクの位置を探す
-                          let depY = 60;
+                          let depY = 45;
                           let found = false;
 
                           filteredData.forEach((proj) => {
                             if (found) return;
-                            depY += 60; // プロジェクト行
+                            depY += 45; // プロジェクト行
 
                             proj.tasks.forEach((t) => {
                               if (found) return;
@@ -376,7 +379,7 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                                 found = true;
                                 return;
                               }
-                              depY += 50; // タスク行
+                              depY += 38; // タスク行
                             });
 
                             if (!found) {
@@ -393,7 +396,7 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                               fromX: fromPos.left + fromPos.width,
                               fromY: depY,
                               toX: toPos.left,
-                              toY: currentY + (taskIndex * 50),
+                              toY: currentY + (taskIndex * 38),
                               color: darkMode ? '#60a5fa' : '#3b82f6'
                             });
                           }
@@ -402,7 +405,7 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                     }
                   });
 
-                  currentY += project.tasks.length * 50;
+                  currentY += project.tasks.length * 38;
                 });
 
                 if (arrows.length === 0) return null;
@@ -419,10 +422,10 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                     {arrows.map(arrow => {
                       // 矢印のパスを生成
                       const midX = (arrow.fromX + arrow.toX) / 2;
-                      const path = `M ${arrow.fromX + 256}% ${arrow.fromY + 25}
-                                    L ${midX + 256}% ${arrow.fromY + 25}
-                                    L ${midX + 256}% ${arrow.toY + 25}
-                                    L ${arrow.toX + 256}% ${arrow.toY + 25}`;
+                      const path = `M ${arrow.fromX + 256}% ${arrow.fromY + 19}
+                                    L ${midX + 256}% ${arrow.fromY + 19}
+                                    L ${midX + 256}% ${arrow.toY + 19}
+                                    L ${arrow.toX + 256}% ${arrow.toY + 19}`;
 
                       return (
                         <g key={arrow.key}>
@@ -437,7 +440,7 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                           />
                           {/* 矢印のヘッド */}
                           <polygon
-                            points={`${arrow.toX + 256},${arrow.toY + 25} ${arrow.toX + 256 - 6},${arrow.toY + 25 - 4} ${arrow.toX + 256 - 6},${arrow.toY + 25 + 4}`}
+                            points={`${arrow.toX + 256},${arrow.toY + 19} ${arrow.toX + 256 - 6},${arrow.toY + 19 - 4} ${arrow.toX + 256 - 6},${arrow.toY + 19 + 4}`}
                             fill={arrow.color}
                             opacity="0.6"
                           />

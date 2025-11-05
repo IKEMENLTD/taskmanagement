@@ -13,12 +13,34 @@ export default {
           100: '#dbeafe',
           200: '#bfdbfe',
           300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
+          400: 'var(--theme-primaryLight)',
+          500: 'var(--theme-primary)',
+          600: 'var(--theme-primaryHover)',
           700: '#1d4ed8',
           800: '#1e40af',
           900: '#1e3a8a',
+        },
+        // blueカラーをテーマカラーにマッピング
+        blue: {
+          400: 'var(--theme-primaryLight)',
+          500: 'var(--theme-primary)',
+          600: 'var(--theme-primaryHover)',
+        },
+        // その他のテーマカラー
+        violet: {
+          500: 'var(--theme-secondary)',
+        },
+        purple: {
+          500: 'var(--theme-secondary)',
+        },
+        green: {
+          500: 'var(--theme-success)',
+        },
+        red: {
+          500: 'var(--theme-error)',
+        },
+        amber: {
+          500: 'var(--theme-warning)',
         },
       },
       animation: {

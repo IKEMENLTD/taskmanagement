@@ -19,12 +19,48 @@ export const useRoutines = (initialRoutines = {}) => {
 
   /**
    * 今日のルーティン達成率を計算
+   * スキップされたタスクを除外して計算
    */
   const getRoutineCompletionRate = (currentTime) => {
     const todayRoutines = getTodayRoutines(currentTime);
     if (todayRoutines.length === 0) return 0;
-    const completed = todayRoutines.filter(r => r.completed).length;
-    return Math.round((completed / todayRoutines.length) * 100);
+
+    const completed = todayRoutines.filter(r => r.completed || r.status === 'completed').length;
+    const skipped = todayRoutines.filter(r => r.status === 'skipped').length;
+    const total = todayRoutines.length;
+
+    // スキップを除外したタスクから達成率を計算
+    const eligibleTasks = total - skipped;
+    if (eligibleTasks === 0) return 0;
+
+    return Math.round((completed / eligibleTasks) * 100);
+  };
+
+  /**
+   * 今日のルーティン詳細統計を取得
+   * 完了数、スキップ数、達成率、スキップ率などを含む
+   */
+  const getRoutineDetailedStats = (currentTime) => {
+    const todayRoutines = getTodayRoutines(currentTime);
+
+    const completed = todayRoutines.filter(r => r.completed || r.status === 'completed').length;
+    const skipped = todayRoutines.filter(r => r.status === 'skipped').length;
+    const pending = todayRoutines.filter(r => r.status === 'pending' || (!r.status && !r.completed)).length;
+    const total = todayRoutines.length;
+
+    const eligibleTasks = total - skipped;
+    const completionRate = eligibleTasks > 0 ? Math.round((completed / eligibleTasks) * 100) : 0;
+    const skipRate = total > 0 ? Math.round((skipped / total) * 100) : 0;
+
+    return {
+      completed,
+      skipped,
+      pending,
+      total,
+      completionRate,
+      skipRate,
+      eligibleTasks
+    };
   };
 
   /**
@@ -63,6 +99,7 @@ export const useRoutines = (initialRoutines = {}) => {
 
   /**
    * チーム全体のルーティン統計を取得
+   * スキップされたタスクを考慮
    */
   const getTeamRoutineStats = (currentTime, teamMembers) => {
     const todayRoutines = getTodayRoutines(currentTime);
@@ -70,14 +107,23 @@ export const useRoutines = (initialRoutines = {}) => {
 
     teamMembers.forEach(member => {
       const memberRoutines = todayRoutines.filter(r => r.assignee === member.name);
-      const completed = memberRoutines.filter(r => r.completed).length;
+      const completed = memberRoutines.filter(r => r.completed || r.status === 'completed').length;
+      const skipped = memberRoutines.filter(r => r.status === 'skipped').length;
       const total = memberRoutines.length;
-      const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      // スキップを除外したタスクから達成率を計算
+      const eligibleTasks = total - skipped;
+      const rate = eligibleTasks > 0 ? Math.round((completed / eligibleTasks) * 100) : 0;
+
+      // スキップ率も計算
+      const skipRate = total > 0 ? Math.round((skipped / total) * 100) : 0;
 
       stats[member.name] = {
         completed,
+        skipped,
         total,
         rate,
+        skipRate,
         routines: memberRoutines
       };
     });
@@ -153,6 +199,7 @@ export const useRoutines = (initialRoutines = {}) => {
     setRoutineTasks,
     getTodayRoutines,
     getRoutineCompletionRate,
+    getRoutineDetailedStats,
     toggleRoutineTask,
     getFilteredRoutines,
     getTeamRoutineStats,

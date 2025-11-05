@@ -91,67 +91,115 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
     };
   }, [selectedDate, selectedMember, projects, routineTasks]);
 
-  // 日報テキストを生成
+  // 日報テキストを生成（自動送信と同じフォーマット）
   const generateReportText = () => {
     const date = new Date(selectedDate);
-    const dateStr = `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-    const memberStr = selectedMember === 'all' ? 'チーム全体' : selectedMember;
+    const dateStr = `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
 
-    let report = `# 日報 - ${dateStr} (${memberStr})\n\n`;
+    let report = `📊 日報 ${dateStr}\n`;
+    report += `━━━━━━━━━━━\n`;
 
-    // ルーティンタスク
-    report += `## 📋 ルーティンタスク (達成率: ${reportData.routineCompletionRate}%)\n\n`;
-    if (reportData.completedRoutines.length > 0) {
-      report += `### ✅ 完了 (${reportData.completedRoutines.length}件)\n`;
-      reportData.completedRoutines.forEach(routine => {
-        report += `- ${routine.name} (${routine.assignee})`;
-        if (routine.notes) {
-          report += ` - ${routine.notes}`;
+    // メンバー別にレポートを生成
+    if (selectedMember === 'all') {
+      // チーム全体の場合は、全メンバーのレポート
+      const allMembers = [...new Set([
+        ...reportData.completedRoutines.map(r => r.assignee),
+        ...reportData.incompleteRoutines.map(r => r.assignee),
+        ...reportData.completedTasks.map(t => t.assignee),
+        ...reportData.updatedTasks.map(t => t.assignee)
+      ])];
+
+      allMembers.forEach((member, index) => {
+        report += generateMemberReportSection(member);
+        if (index < allMembers.length - 1) {
+          report += `\n━━━━━━━━━━━\n`;
         }
-        report += '\n';
       });
-      report += '\n';
+    } else {
+      // 個人の場合
+      report += generateMemberReportSection(selectedMember);
     }
 
-    if (reportData.incompleteRoutines.length > 0) {
-      report += `### ⚠️ 未完了 (${reportData.incompleteRoutines.length}件)\n`;
-      reportData.incompleteRoutines.forEach(routine => {
-        report += `- ${routine.name} (${routine.assignee})\n`;
-      });
-      report += '\n';
-    }
+    // フッター
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    report += `\n━━━━━━━━━━━\n`;
+    report += `🤖 4次元PM | ${timeStr}\n`;
+
+    return report;
+  };
+
+  // メンバー別のレポートセクションを生成
+  const generateMemberReportSection = (member) => {
+    const memberCompletedTasks = reportData.completedTasks.filter(t => t.assignee === member);
+    const memberActiveTasks = reportData.updatedTasks.filter(t => t.assignee === member);
+    const memberBlockedTasks = memberActiveTasks.filter(t => t.status === 'blocked');
+    const memberCompletedRoutines = reportData.completedRoutines.filter(r => r.assignee === member);
+    const memberIncompleteRoutines = reportData.incompleteRoutines.filter(r => r.assignee === member);
+
+    const memberRoutineTotal = memberCompletedRoutines.length + memberIncompleteRoutines.length;
+    const memberRoutineRate = memberRoutineTotal > 0
+      ? Math.round((memberCompletedRoutines.length / memberRoutineTotal) * 100)
+      : 0;
+
+    let section = `\n【${member}さん】\n`;
 
     // 完了したタスク
-    if (reportData.completedTasks.length > 0) {
-      report += `## ✨ 完了したタスク (${reportData.completedTasks.length}件)\n\n`;
-      reportData.completedTasks.forEach(task => {
-        report += `- [${task.projectName}] ${task.name} (${task.assignee})`;
-        if (task.description) {
-          report += `\n  ${task.description}`;
-        }
-        report += '\n';
+    if (memberCompletedTasks.length > 0) {
+      section += `✅ 本日完了 (${memberCompletedTasks.length}件)\n`;
+      memberCompletedTasks.forEach((task, index) => {
+        section += `${index + 1}. ${task.name}\n`;
+        section += `  ${task.projectName}\n`;
       });
-      report += '\n';
     }
 
     // 進行中のタスク
-    if (reportData.updatedTasks.length > 0) {
-      report += `## 🔄 進行中のタスク (${reportData.updatedTasks.length}件)\n\n`;
-      reportData.updatedTasks.forEach(task => {
-        report += `- [${task.projectName}] ${task.name} (進捗: ${task.progress}%, ${task.assignee})\n`;
+    const activeNonBlocked = memberActiveTasks.filter(t => t.status !== 'blocked');
+    if (activeNonBlocked.length > 0) {
+      section += `\n🔄 進行中 (${activeNonBlocked.length}件)\n`;
+      activeNonBlocked.slice(0, 3).forEach((task, index) => {
+        const priority = task.priority === 'urgent' ? '🔴' :
+                         task.priority === 'high' ? '🟠' :
+                         task.priority === 'medium' ? '🟡' : '🟢';
+        section += `${index + 1}. ${priority} ${task.name}\n`;
+        section += `  ${task.projectName} (${task.progress}%)`;
+        if (task.dueDate) {
+          section += ` 期限:${task.dueDate}`;
+        }
+        section += `\n`;
       });
-      report += '\n';
+      if (activeNonBlocked.length > 3) {
+        section += `  ...他${activeNonBlocked.length - 3}件\n`;
+      }
     }
 
-    // プロジェクト進捗
-    report += `## 📊 プロジェクト進捗\n\n`;
-    reportData.projectProgress.forEach(project => {
-      if (project.totalTasks > 0) {
-        report += `- ${project.name}: ${project.progress}% (${project.completedTasks}/${project.totalTasks}タスク完了)\n`;
-      }
-    });
+    // ブロック中のタスク
+    if (memberBlockedTasks.length > 0) {
+      section += `\n⚠️ ブロック中 (${memberBlockedTasks.length}件)\n`;
+      memberBlockedTasks.forEach((task, index) => {
+        section += `${index + 1}. ${task.name}\n`;
+        section += `  ${task.projectName}\n`;
+      });
+    }
 
-    return report;
+    // ルーティン達成率
+    if (memberRoutineTotal > 0) {
+      const emoji = memberRoutineRate >= 80 ? '🎉' : memberRoutineRate >= 50 ? '👍' : '💪';
+      section += `\n${emoji} ルーティン達成率: ${memberRoutineRate}%`;
+      section += ` (${memberCompletedRoutines.length}/${memberRoutineTotal}件)\n`;
+    }
+
+    // サマリー
+    const totalTasks = memberCompletedTasks.length + memberActiveTasks.length;
+    section += `\n📈 サマリー\n`;
+    section += `タスク総数: ${totalTasks}件\n`;
+    section += `本日完了: ${memberCompletedTasks.length}件 | 進行中: ${activeNonBlocked.length}件`;
+    if (memberBlockedTasks.length > 0) {
+      section += ` | ブロック: ${memberBlockedTasks.length}件`;
+    }
+    section += `\n`;
+
+    return section;
   };
 
   // クリップボードにコピー

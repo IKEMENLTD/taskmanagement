@@ -5,6 +5,13 @@ import { StatsCard } from '../cards/StatsCard';
 import { RoutineDetailModal } from '../modals/RoutineDetailModal';
 import { getCategoryText } from '../../utils/colorUtils';
 import { useDragAndDrop } from '../../hooks/useDragAndDrop';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  createRoutineTask,
+  updateRoutineTask,
+  deleteRoutineTask,
+  getRoutineTasks
+} from '../../utils/routineUtils';
 
 /**
  * ルーティンビューコンポーネント
@@ -14,6 +21,7 @@ import { useDragAndDrop } from '../../hooks/useDragAndDrop';
  * @param {string} viewMode - 表示モード（メンバー名 | 'team'）
  * @param {Function} onViewModeChange - ビューモード切り替えハンドラー
  * @param {Function} onToggleRoutine - ルーティン切り替えハンドラー
+ * @param {Function} onSkipRoutine - ルーティンスキップハンドラー
  * @param {Array} teamMembers - チームメンバー一覧
  * @param {Array} projects - プロジェクト一覧
  * @param {boolean} darkMode - ダークモードフラグ
@@ -32,6 +40,7 @@ export const RoutineView = ({
   viewMode,
   onViewModeChange,
   onToggleRoutine,
+  onSkipRoutine,
   teamMembers,
   projects,
   darkMode = false,
@@ -43,6 +52,7 @@ export const RoutineView = ({
   setRoutineCategories,
   getFilteredRoutines
 }) => {
+  const { user } = useAuth();
   const cardBg = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
   const textColor = darkMode ? 'text-gray-100' : 'text-gray-900';
   const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-500';
@@ -97,6 +107,26 @@ export const RoutineView = ({
       project: filterProject
     });
   }, [routines, currentTime, viewMode, filterMember, filterProject, getFilteredRoutines]);
+
+  // フィルター済みルーティンの統計を計算
+  const filteredStats = useMemo(() => {
+    const completed = filteredRoutines.filter(r => r.completed || r.status === 'completed').length;
+    const skipped = filteredRoutines.filter(r => r.status === 'skipped').length;
+    const total = filteredRoutines.length;
+    const pending = total - completed - skipped;
+
+    // スキップを除外した達成率
+    const eligibleTasks = total - skipped;
+    const rate = eligibleTasks > 0 ? Math.round((completed / eligibleTasks) * 100) : 0;
+
+    return {
+      completed,
+      skipped,
+      pending,
+      total,
+      completionRate: rate
+    };
+  }, [filteredRoutines]);
 
   // ローカル状態でルーティンを管理（ドラッグ中の並び替えを反映）
   const [localRoutines, setLocalRoutines] = useState(filteredRoutines);
@@ -167,14 +197,14 @@ export const RoutineView = ({
   const openEditModal = (routine) => {
     setEditingRoutine(routine);
     setFormData({
-      name: routine.name,
-      time: routine.time,
-      category: routine.category,
-      assignee: routine.assignee,
-      description: routine.description,
-      repeat: routine.repeat,
-      duration: routine.duration,
-      projectId: routine.projectId,
+      name: routine.name || '',
+      time: routine.time || '09:00',
+      category: routine.category || 'work',
+      assignee: routine.assignee || '',
+      description: routine.description || '',
+      repeat: routine.repeat || 'daily',
+      duration: routine.duration || 30,
+      projectId: routine.projectId || null,
       selectedDays: routine.selectedDays || []
     });
     setShowModal(true);
@@ -200,7 +230,7 @@ export const RoutineView = ({
     openEditModal(routine);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim() || !formData.assignee) {
       alert('必須項目を入力してください。');
       return;
@@ -212,28 +242,89 @@ export const RoutineView = ({
       return;
     }
 
+    if (!user?.id) {
+      alert('ログインが必要です。');
+      return;
+    }
+
     const today = getTodayDateString();
     const todayRoutines = routineTasks[today] || [];
 
     if (editingRoutine) {
-      // 編集
+      // 編集: Supabaseを更新
+      const { data, error } = await updateRoutineTask(editingRoutine.id, {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        time: formData.time,
+        category: formData.category,
+        project_id: formData.projectId,
+        assignee: formData.assignee,
+        repeat: formData.repeat,
+        duration: formData.duration
+      });
+
+      if (error) {
+        console.error('ルーティン更新エラー:', error);
+        alert('ルーティンの更新に失敗しました。');
+        return;
+      }
+
+      // ローカル状態を更新
       const updatedRoutines = todayRoutines.map(r =>
         r.id === editingRoutine.id
-          ? { ...r, ...formData, name: formData.name.trim(), description: formData.description.trim() }
+          ? {
+              ...r,
+              name: formData.name.trim(),
+              description: formData.description.trim(),
+              time: formData.time,
+              category: formData.category,
+              projectId: formData.projectId,
+              assignee: formData.assignee,
+              repeat: formData.repeat,
+              duration: formData.duration
+            }
           : r
       );
       setRoutineTasks({ ...routineTasks, [today]: updatedRoutines });
     } else {
-      // 新規追加
-      const newRoutine = {
-        id: `r${Date.now()}`,
-        ...formData,
+      // 新規追加: Supabaseに保存
+      const { data, error } = await createRoutineTask(user.id, {
         name: formData.name.trim(),
         description: formData.description.trim(),
+        time: formData.time,
+        category: formData.category,
+        projectId: formData.projectId,
+        assignee: formData.assignee,
+        repeat: formData.repeat,
+        duration: formData.duration,
+        date: today
+      });
+
+      if (error) {
+        console.error('ルーティン作成エラー:', error);
+        alert('ルーティンの作成に失敗しました。');
+        return;
+      }
+
+      // ローカル状態を更新
+      const newRoutine = {
+        id: data.id,
+        name: data.name,
+        description: data.description || '',
+        time: data.time,
+        category: data.category,
+        projectId: data.project_id || null,
+        assignee: data.assignee,
+        repeat: data.repeat,
+        duration: data.duration,
+        date: data.date,
+        status: data.status,
         completed: false,
         notes: '',
         streak: 0,
-        completedDates: []
+        completedDates: [],
+        created_at: data.created_at,
+        updated_at: data.updated_at
       };
       setRoutineTasks({ ...routineTasks, [today]: [...todayRoutines, newRoutine] });
     }
@@ -241,9 +332,19 @@ export const RoutineView = ({
     closeModal();
   };
 
-  const handleDelete = (routineId) => {
+  const handleDelete = async (routineId) => {
     if (!window.confirm('このルーティンを削除しますか？')) return;
 
+    // Supabaseから削除
+    const { error } = await deleteRoutineTask(routineId);
+
+    if (error) {
+      console.error('ルーティン削除エラー:', error);
+      alert('ルーティンの削除に失敗しました。');
+      return;
+    }
+
+    // ローカル状態を更新
     const today = getTodayDateString();
     const todayRoutines = routineTasks[today] || [];
     const updatedRoutines = todayRoutines.filter(r => r.id !== routineId);
@@ -252,7 +353,26 @@ export const RoutineView = ({
   };
 
   // ルーティン更新
-  const handleUpdateRoutine = (updatedRoutine) => {
+  const handleUpdateRoutine = async (updatedRoutine) => {
+    // Supabaseを更新
+    const { error } = await updateRoutineTask(updatedRoutine.id, {
+      name: updatedRoutine.name,
+      description: updatedRoutine.description,
+      time: updatedRoutine.time,
+      category: updatedRoutine.category,
+      project_id: updatedRoutine.projectId,
+      assignee: updatedRoutine.assignee,
+      repeat: updatedRoutine.repeat,
+      duration: updatedRoutine.duration
+    });
+
+    if (error) {
+      console.error('ルーティン更新エラー:', error);
+      alert('ルーティンの更新に失敗しました。');
+      return;
+    }
+
+    // ローカル状態を更新
     const today = getTodayDateString();
     const todayRoutines = routineTasks[today] || [];
     const updatedRoutines = todayRoutines.map(r =>
@@ -340,30 +460,37 @@ export const RoutineView = ({
       )}
 
       {/* 統計カード */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatsCard
-          title="今日の達成率"
-          value={completionRate}
-          unit="%"
-          icon={Target}
-          color="blue"
-          darkMode={darkMode}
-        />
-        <StatsCard
-          title="完了タスク"
-          value={routines.filter(r => r.completed).length}
-          unit={`/${routines.length}`}
-          icon={Clock}
-          color="green"
-          darkMode={darkMode}
-        />
-        <StatsCard
-          title="残りタスク"
-          value={routines.filter(r => !r.completed).length}
-          icon={Clock}
-          color="purple"
-          darkMode={darkMode}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <StatsCard
+            title={viewMode === 'team' ? '全体の達成率' : `${viewMode}の達成率`}
+            value={filteredStats.completionRate}
+            unit="%"
+            icon={Target}
+            color="blue"
+            darkMode={darkMode}
+          />
+          <StatsCard
+            title="完了タスク"
+            value={filteredStats.completed}
+            unit={`/${filteredStats.total}`}
+            icon={Clock}
+            color="green"
+            darkMode={darkMode}
+          />
+          <StatsCard
+            title="残りタスク"
+            value={filteredStats.pending}
+            icon={Clock}
+            color="purple"
+            darkMode={darkMode}
+          />
+          <StatsCard
+            title="スキップ"
+            value={filteredStats.skipped}
+            icon={Clock}
+            color="gray"
+            darkMode={darkMode}
+          />
       </div>
 
       {/* チーム統計（チームビューの時のみ） */}
@@ -407,6 +534,7 @@ export const RoutineView = ({
                 key={routine.id}
                 routine={routine}
                 onToggle={onToggleRoutine}
+                onSkip={onSkipRoutine}
                 onClick={() => openDetailModal(routine)}
                 showAssignee={viewMode === 'team'}
                 darkMode={darkMode}
@@ -446,6 +574,7 @@ export const RoutineView = ({
                         key={routine.id}
                         routine={routine}
                         onToggle={onToggleRoutine}
+                        onSkip={onSkipRoutine}
                         onClick={() => openDetailModal(routine)}
                         showAssignee={viewMode === 'team'}
                         darkMode={darkMode}

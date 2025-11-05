@@ -12,6 +12,14 @@ import {
   bulkDeleteTasks,
   bulkMoveTasksToProject
 } from '../../utils/bulkOperationsUtils';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  canCreateProject,
+  canCreateTask,
+  canEditTask,
+  canDeleteTask
+} from '../../utils/permissionUtils';
+import { createProject, updateProject, deleteProject, createTask, updateTask, deleteTask } from '../../utils/projectUtils';
 
 /**
  * タイムラインビューコンポーネント
@@ -22,6 +30,9 @@ import {
  * @param {boolean} darkMode - ダークモードフラグ
  */
 export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers = [], darkMode = false }) => {
+  // 認証情報
+  const { user, role } = useAuth();
+
   const cardBg = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
   const textColor = darkMode ? 'text-gray-100' : 'text-gray-900';
   const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-500';
@@ -252,7 +263,7 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
   };
 
   // 保存
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.name.trim() || !formData.timeline.start || !formData.timeline.end) {
       alert('必須項目を入力してください。');
       return;
@@ -266,6 +277,21 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
 
     if (editingProject) {
       // 編集
+      const { data, error } = await updateProject(editingProject.id, {
+        name: formData.name.trim(),
+        color: formData.color,
+        status: formData.status,
+        progress: formData.progress,
+        timeline: formData.timeline
+      });
+
+      if (error) {
+        console.error('プロジェクト更新エラー:', error);
+        alert('プロジェクトの更新に失敗しました');
+        return;
+      }
+
+      // ローカルステートを更新
       const updatedProjects = projects.map(p =>
         p.id === editingProject.id
           ? { ...p, ...formData, name: formData.name.trim() }
@@ -274,21 +300,41 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
       setProjects(updatedProjects);
     } else {
       // 新規追加
-      const newProject = {
-        id: Date.now(),
-        ...formData,
+      const { data, error } = await createProject({
         name: formData.name.trim(),
-        tasks: []
-      };
-      setProjects([...projects, newProject]);
+        color: formData.color,
+        status: formData.status,
+        progress: formData.progress,
+        timeline: formData.timeline
+      });
+
+      if (error) {
+        console.error('プロジェクト作成エラー:', error);
+        alert('プロジェクトの作成に失敗しました');
+        return;
+      }
+
+      // ローカルステートを更新
+      if (data) {
+        setProjects([...projects, { ...data, team: formData.team }]);
+      }
     }
 
     closeModal();
   };
 
   // 削除
-  const handleDelete = (projectId) => {
+  const handleDelete = async (projectId) => {
     if (!window.confirm('このプロジェクトを削除しますか？')) return;
+
+    const { error } = await deleteProject(projectId);
+
+    if (error) {
+      console.error('プロジェクト削除エラー:', error);
+      alert('プロジェクトの削除に失敗しました');
+      return;
+    }
+
     setProjects(projects.filter(p => p.id !== projectId));
     closeDetailModal();
   };
@@ -338,7 +384,7 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
   };
 
   // タスク保存
-  const handleSaveTask = () => {
+  const handleSaveTask = async () => {
     if (!taskFormData.name.trim() || !taskFormData.assignee) {
       alert('必須項目を入力してください。');
       return;
@@ -352,12 +398,30 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
       }
     }
 
-    const updatedProjects = projects.map(p => {
-      if (p.id === currentProjectId) {
-        let updatedTasks;
-        if (editingTask) {
-          // 編集
-          updatedTasks = p.tasks.map(t =>
+    if (editingTask) {
+      // 編集
+      const { data, error } = await updateTask(editingTask.id, {
+        name: taskFormData.name.trim(),
+        description: taskFormData.description.trim(),
+        assignee: taskFormData.assignee,
+        status: taskFormData.status,
+        priority: taskFormData.priority,
+        progress: taskFormData.progress,
+        startDate: taskFormData.startDate,
+        dueDate: taskFormData.dueDate,
+        completedDate: taskFormData.status === 'completed' ? new Date().toISOString().split('T')[0] : null
+      });
+
+      if (error) {
+        console.error('タスク更新エラー:', error);
+        alert('タスクの更新に失敗しました');
+        return;
+      }
+
+      // ローカルステートを更新
+      const updatedProjects = projects.map(p => {
+        if (p.id === currentProjectId) {
+          const updatedTasks = p.tasks.map(t =>
             t.id === editingTask.id
               ? {
                   ...t,
@@ -368,39 +432,70 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                 }
               : t
           );
-        } else {
-          // 新規追加
-          const newTask = {
-            id: Date.now(),
-            ...taskFormData,
-            name: taskFormData.name.trim(),
-            description: taskFormData.description.trim(),
-            blockers: [],
-            tags: [],
-            estimatedHours: 0,
-            actualHours: 0,
-            completedDate: null,
-            subTasks: [],
-            attachments: [],
-            comments: [],
-            activities: [],
-            dependencies: [],
-            relatedTasks: []
-          };
-          updatedTasks = [...p.tasks, newTask];
+          return { ...p, tasks: updatedTasks };
         }
-        return { ...p, tasks: updatedTasks };
-      }
-      return p;
-    });
+        return p;
+      });
+      setProjects(updatedProjects);
+    } else {
+      // 新規追加
+      const { data, error } = await createTask(currentProjectId, {
+        name: taskFormData.name.trim(),
+        description: taskFormData.description.trim(),
+        assignee: taskFormData.assignee,
+        status: taskFormData.status,
+        priority: taskFormData.priority,
+        progress: taskFormData.progress,
+        startDate: taskFormData.startDate,
+        dueDate: taskFormData.dueDate
+      });
 
-    setProjects(updatedProjects);
+      if (error) {
+        console.error('タスク作成エラー:', error);
+        alert('タスクの作成に失敗しました');
+        return;
+      }
+
+      // ローカルステートを更新
+      if (data) {
+        const updatedProjects = projects.map(p => {
+          if (p.id === currentProjectId) {
+            const newTask = {
+              ...data,
+              projectId: currentProjectId,
+              blockers: [],
+              tags: [],
+              estimatedHours: 0,
+              actualHours: 0,
+              subTasks: [],
+              attachments: [],
+              comments: [],
+              activities: [],
+              dependencies: [],
+              relatedTasks: []
+            };
+            return { ...p, tasks: [...p.tasks, newTask] };
+          }
+          return p;
+        });
+        setProjects(updatedProjects);
+      }
+    }
+
     closeTaskModal();
   };
 
   // タスク削除
-  const handleDeleteTask = (taskId, projectId) => {
+  const handleDeleteTask = async (taskId, projectId) => {
     if (!window.confirm('このタスクを削除しますか？')) return;
+
+    const { error } = await deleteTask(taskId);
+
+    if (error) {
+      console.error('タスク削除エラー:', error);
+      alert('タスクの削除に失敗しました');
+      return;
+    }
 
     const updatedProjects = projects.map(p => {
       if (p.id === projectId) {
@@ -434,13 +529,15 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
           <h2 className={`text-2xl font-bold ${textColor}`}>プロジェクト一覧</h2>
           <p className={`${textSecondary} mt-1`}>すべてのプロジェクトと進捗を確認できます</p>
         </div>
-        <button
-          onClick={openAddModal}
-          className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
-        >
-          <Plus size={18} />
-          プロジェクト追加
-        </button>
+        {canCreateProject(role) && (
+          <button
+            onClick={openAddModal}
+            className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+          >
+            <Plus size={18} />
+            プロジェクト追加
+          </button>
+        )}
       </div>
 
       {/* フィルター */}
@@ -542,12 +639,14 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <h3 className={`font-bold ${textColor}`}>{project.name}</h3>
-                <button
-                  onClick={() => openDetailModal(project)}
-                  className={`${textSecondary} hover:${textColor} transition-colors p-1`}
-                >
-                  <Edit size={14} />
-                </button>
+                {canCreateProject(role) && (
+                  <button
+                    onClick={() => openDetailModal(project)}
+                    className={`${textSecondary} hover:${textColor} transition-colors p-1`}
+                  >
+                    <Edit size={14} />
+                  </button>
+                )}
               </div>
               <div className={`text-xs ${textSecondary} mt-1 flex items-center gap-3`}>
                 <span className="flex items-center gap-1">
@@ -582,15 +681,17 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
           </div>
 
           {/* タスク追加ボタン */}
-          <div className="mt-3 flex justify-end">
-            <button
-              onClick={() => openAddTaskModal(project.id)}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-all text-xs flex items-center gap-1 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
-            >
-              <Plus size={14} />
-              タスク追加
-            </button>
-          </div>
+          {canCreateTask(role) && (
+            <div className="mt-3 flex justify-end">
+              <button
+                onClick={() => openAddTaskModal(project.id)}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-all text-xs flex items-center gap-1 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+              >
+                <Plus size={14} />
+                タスク追加
+              </button>
+            </div>
+          )}
 
           {/* タスク一覧 */}
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -644,26 +745,30 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                   <div className="flex items-center gap-1">
                     {task.status === 'completed' && <CheckCircle size={14} className="text-green-500" />}
                     {task.status === 'blocked' && <AlertCircle size={14} className="text-red-500 animate-pulse" />}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditTaskModal(task, project.id);
-                      }}
-                      className={`${textSecondary} hover:text-blue-500 transition-colors p-1`}
-                      title="編集"
-                    >
-                      <Edit size={12} />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteTask(task.id, project.id);
-                      }}
-                      className={`${textSecondary} hover:text-red-500 transition-colors p-1`}
-                      title="削除"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    {canEditTask(role, task.assignee, user?.id) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditTaskModal(task, project.id);
+                        }}
+                        className={`${textSecondary} hover:text-blue-500 transition-colors p-1`}
+                        title="編集"
+                      >
+                        <Edit size={12} />
+                      </button>
+                    )}
+                    {canDeleteTask(role) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTask(task.id, project.id);
+                        }}
+                        className={`${textSecondary} hover:text-red-500 transition-colors p-1`}
+                        title="削除"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className={`text-xs ${textSecondary} mb-1`}>{task.assignee}</div>

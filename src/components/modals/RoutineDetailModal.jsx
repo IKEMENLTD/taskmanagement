@@ -42,7 +42,8 @@ export const RoutineDetailModal = ({
 
   // Streak（連続達成日数）を計算
   const calculateStreak = () => {
-    if (!routine.completedDates || routine.completedDates.length === 0) {
+    // completedDatesがない、または空配列の場合は0を返す
+    if (!routine.completedDates || !Array.isArray(routine.completedDates) || routine.completedDates.length === 0) {
       return 0;
     }
 
