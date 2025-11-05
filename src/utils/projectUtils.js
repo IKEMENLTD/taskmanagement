@@ -35,9 +35,18 @@ export const getAllProjects = async () => {
           return { ...project, tasks: [] };
         }
 
+        // タスクのフィールド名をキャメルケースに変換
+        const convertedTasks = (tasks || []).map(task => ({
+          ...task,
+          projectId: task.project_id,
+          startDate: task.start_date,
+          dueDate: task.due_date,
+          completedDate: task.completed_date
+        }));
+
         return {
           ...project,
-          tasks: tasks || [],
+          tasks: convertedTasks,
           timeline: {
             start: project.timeline_start,
             end: project.timeline_end
