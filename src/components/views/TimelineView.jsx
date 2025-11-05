@@ -401,8 +401,8 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
     if (editingTask) {
       // 編集
       const { data, error } = await updateTask(editingTask.id, {
-        name: taskFormData.name.trim(),
-        description: taskFormData.description.trim(),
+        name: taskFormData.name?.trim() || taskFormData.name,
+        description: taskFormData.description?.trim() || taskFormData.description || null,
         assignee: taskFormData.assignee,
         status: taskFormData.status,
         priority: taskFormData.priority,
@@ -426,8 +426,8 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
               ? {
                   ...t,
                   ...taskFormData,
-                  name: taskFormData.name.trim(),
-                  description: taskFormData.description.trim(),
+                  name: taskFormData.name?.trim() || taskFormData.name,
+                  description: taskFormData.description?.trim() || taskFormData.description || null,
                   completedDate: taskFormData.status === 'completed' ? new Date().toISOString().split('T')[0] : null
                 }
               : t
@@ -440,8 +440,8 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
     } else {
       // 新規追加
       const { data, error } = await createTask(currentProjectId, {
-        name: taskFormData.name.trim(),
-        description: taskFormData.description.trim(),
+        name: taskFormData.name?.trim() || taskFormData.name,
+        description: taskFormData.description?.trim() || taskFormData.description || null,
         assignee: taskFormData.assignee,
         status: taskFormData.status,
         priority: taskFormData.priority,
