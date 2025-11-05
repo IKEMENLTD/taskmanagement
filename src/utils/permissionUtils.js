@@ -10,6 +10,10 @@ import { supabase } from '../lib/supabase';
  * @returns {Promise<string>} - ロール（admin, member, viewer）
  */
 export const getUserRole = async (userId) => {
+  // チーム共有環境では全員が管理者として扱う
+  return 'admin';
+
+  /* 将来的に権限管理が必要になった場合は以下のコードを有効化
   try {
     const { data, error } = await supabase
       .from('user_settings')
@@ -19,14 +23,15 @@ export const getUserRole = async (userId) => {
 
     if (error) {
       console.error('ロール取得エラー:', error);
-      return 'member'; // デフォルトはメンバー
+      return 'admin'; // デフォルトは管理者
     }
 
-    return data?.role || 'member';
+    return data?.role || 'admin';
   } catch (err) {
     console.error('ロール取得エラー:', err);
-    return 'member';
+    return 'admin';
   }
+  */
 };
 
 /**
