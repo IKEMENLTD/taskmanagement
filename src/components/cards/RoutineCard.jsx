@@ -3,6 +3,20 @@ import { Clock, CheckCircle, Target, GripVertical, XCircle } from 'lucide-react'
 import { getCategoryColor, getCategoryText } from '../../utils/colorUtils';
 
 /**
+ * 繰り返しテキストを取得
+ */
+const getRepeatText = (routine) => {
+  if (routine.repeat === 'daily') return '毎日';
+  if (routine.repeat === 'weekday') return '平日';
+  if (routine.repeat === 'weekend') return '週末';
+  if (routine.repeat === 'custom' && routine.selectedDays && routine.selectedDays.length > 0) {
+    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    return routine.selectedDays.map(day => dayNames[day]).join('・');
+  }
+  return 'カスタム';
+};
+
+/**
  * ルーティンタスクカードコンポーネント（React.memoで最適化）
  * @param {Object} routine - ルーティンオブジェクト
  * @param {Function} onToggle - 完了/未完了切り替えハンドラー
@@ -85,12 +99,14 @@ const RoutineCardComponent = ({
             )}
           </div>
 
-          <div className={`text-xs mt-1 flex items-center gap-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'
+          <div className={`text-xs mt-1 flex items-center gap-2 flex-wrap ${darkMode ? 'text-gray-400' : 'text-gray-500'
             }`}>
             <Clock size={12} />
             <span>{routine.time}</span>
             <span>•</span>
             <span>{routine.duration}分</span>
+            <span>•</span>
+            <span>{getRepeatText(routine)}</span>
             {routine.streak && (
               <>
                 <span>•</span>

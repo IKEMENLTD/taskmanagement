@@ -10,7 +10,8 @@ import {
   createRoutineTask,
   updateRoutineTask,
   deleteRoutineTask,
-  getRoutineTasks
+  getRoutineTasks,
+  shouldRoutineRunOnDate
 } from '../../utils/routineUtils';
 
 /**
@@ -99,16 +100,25 @@ export const RoutineView = ({
   // ドラッグ&ドロップフック
   const { getDraggableProps, getDropZoneStyle, reorderItems } = useDragAndDrop();
 
-  // フィルター済みルーティンを取得
+  // フィルター済みルーティンを取得（曜日フィルタリング含む）
   const filteredRoutines = useMemo(() => {
-    if (!getFilteredRoutines) return routines;
-    return getFilteredRoutines(currentTime, {
-      member: viewMode === 'team' ? filterMember : viewMode,
-      project: filterProject
-    });
+    let result = routines;
+
+    // 既存のフィルター処理
+    if (getFilteredRoutines) {
+      result = getFilteredRoutines(currentTime, {
+        member: viewMode === 'team' ? filterMember : viewMode,
+        project: filterProject
+      });
+    }
+
+    // 曜日フィルタリング: 今日実行されるべきルーティンのみを表示
+    result = result.filter(routine => shouldRoutineRunOnDate(routine, currentTime));
+
+    return result;
   }, [routines, currentTime, viewMode, filterMember, filterProject, getFilteredRoutines]);
 
-  // フィルター済みルーティンの統計を計算
+  // フィルター済みルーティンの統計を計算（曜日フィルタリング後）
   const filteredStats = useMemo(() => {
     const completed = filteredRoutines.filter(r => r.completed || r.status === 'completed').length;
     const skipped = filteredRoutines.filter(r => r.status === 'skipped').length;

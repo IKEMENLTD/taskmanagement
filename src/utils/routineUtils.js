@@ -236,3 +236,37 @@ export const getRoutineStats = async (userId, startDate, endDate) => {
     return { data: null, error: err };
   }
 };
+
+/**
+ * ルーティンが指定された日付に実行されるべきかを判定
+ * @param {Object} routine - ルーティンオブジェクト
+ * @param {Date} date - 判定する日付
+ * @returns {boolean} - その日に実行されるべきならtrue
+ */
+export const shouldRoutineRunOnDate = (routine, date) => {
+  if (!routine || !date) return false;
+
+  const dayOfWeek = date.getDay(); // 0=日曜, 1=月曜, ..., 6=土曜
+
+  if (routine.repeat === 'daily') {
+    return true;
+  }
+
+  if (routine.repeat === 'weekday') {
+    // 平日（月〜金）
+    return dayOfWeek >= 1 && dayOfWeek <= 5;
+  }
+
+  if (routine.repeat === 'weekend') {
+    // 週末（土日）
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  }
+
+  if (routine.repeat === 'custom' && routine.selectedDays && routine.selectedDays.length > 0) {
+    // カスタム（選択された曜日）
+    return routine.selectedDays.includes(dayOfWeek);
+  }
+
+  // その他の場合はデフォルトでtrue（後方互換性のため）
+  return true;
+};
