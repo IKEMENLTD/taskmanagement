@@ -201,12 +201,56 @@ const Dashboard = () => {
       })
       .subscribe();
 
+    // ルーティンタスクの変更を監視
+    const routinesSubscription = supabase
+      .channel('routines-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'routine_tasks' }, async (payload) => {
+        console.log('ルーティンタスク変更検知:', payload);
+
+        // 今日のデータを再取得
+        const today = new Date().toISOString().split('T')[0];
+        const { data, error } = await getRoutineTasks(user.id, today);
+
+        if (!error && data) {
+          const mappedData = data.map(task => ({
+            id: task.id,
+            name: task.name,
+            description: task.description || '',
+            time: task.time,
+            category: task.category,
+            projectId: task.project_id || null,
+            assignee: task.assignee,
+            repeat: task.repeat,
+            selectedDays: task.selectedDays || task.selected_days || [],
+            duration: task.duration,
+            date: task.date,
+            status: task.status,
+            skip_reason: task.skip_reason || null,
+            completed: task.status === 'completed',
+            completed_at: task.completed_at,
+            skipped_at: task.skipped_at,
+            notes: '',
+            streak: 0,
+            completedDates: [],
+            created_at: task.created_at,
+            updated_at: task.updated_at
+          }));
+
+          setRoutineTasks(prev => ({
+            ...prev,
+            [today]: mappedData
+          }));
+        }
+      })
+      .subscribe();
+
     // クリーンアップ
     return () => {
       projectsSubscription.unsubscribe();
       tasksSubscription.unsubscribe();
       membersSubscription.unsubscribe();
       categoriesSubscription.unsubscribe();
+      routinesSubscription.unsubscribe();
     };
   }, [user]);
 
@@ -259,6 +303,7 @@ const Dashboard = () => {
           projectId: task.project_id || null,
           assignee: task.assignee,
           repeat: task.repeat,
+          selectedDays: task.selectedDays || task.selected_days || [],
           duration: task.duration,
           date: task.date,
           status: task.status,
@@ -281,7 +326,7 @@ const Dashboard = () => {
     };
 
     loadRoutineTasks();
-  }, [user, currentTime, setRoutineTasks]);
+  }, [user?.id]); // currentTimeを削除（日付が変わった時は別のuseEffectで処理）
 
   // 日付変更時の自動スキップ処理
   useEffect(() => {
