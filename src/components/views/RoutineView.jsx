@@ -371,8 +371,33 @@ export const RoutineView = ({
     setRoutineTasks({ ...routineTasks, [today]: updatedRoutines });
   };
 
+  // 日付と曜日を取得
+  const formatDate = () => {
+    const year = currentTime.getFullYear();
+    const month = currentTime.getMonth() + 1;
+    const date = currentTime.getDate();
+    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    const dayOfWeek = dayNames[currentTime.getDay()];
+    return `${year}年${month}月${date}日（${dayOfWeek}）`;
+  };
+
   return (
     <div className="space-y-6">
+      {/* 日付表示 */}
+      <div className={`${cardBg} rounded-xl p-4 border`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className={`text-2xl font-bold ${textColor}`}>
+              📅 {formatDate()}
+            </h2>
+            <p className={`text-sm ${textSecondary} mt-1`}>
+              今日のルーティンタスク
+            </p>
+          </div>
+          <Clock size={32} className={textSecondary} />
+        </div>
+      </div>
+
       {/* ビュー切り替え */}
       <div className={`${cardBg} rounded-xl p-4 border`}>
         <div className="flex flex-wrap gap-2">
