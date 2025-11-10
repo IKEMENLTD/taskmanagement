@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, Copy, Download, FileText, CheckCircle, Target, Clock, User } from 'lucide-react';
+import { Calendar, Copy, Download, FileText, CheckCircle, Target, Clock, User, Send } from 'lucide-react';
+import { getLineSettings, generateMemberReport, generateTeamReport, sendLineMessage } from '../../utils/lineMessagingApiUtils';
 
 /**
  * 日報ビューコンポーネント
@@ -17,6 +18,11 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMember, setSelectedMember] = useState('all');
   const [showCopySuccess, setShowCopySuccess] = useState(false);
+  const [isSendingLine, setIsSendingLine] = useState(false);
+  const [lineMessage, setLineMessage] = useState({ type: '', text: '' });
+
+  // LINE設定を取得
+  const lineSettings = getLineSettings();
 
   // 日報データを集計
   const reportData = useMemo(() => {
@@ -225,6 +231,53 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
     URL.revokeObjectURL(url);
   };
 
+  // LINEに送信
+  const handleSendLine = async () => {
+    if (!lineSettings.channelAccessToken || !lineSettings.groupId) {
+      setLineMessage({ type: 'error', text: 'LINE設定が未設定です。設定画面から設定してください。' });
+      setTimeout(() => setLineMessage({ type: '', text: '' }), 3000);
+      return;
+    }
+
+    setIsSendingLine(true);
+    setLineMessage({ type: 'info', text: '送信中...' });
+
+    try {
+      // 日報メッセージを生成
+      let message = '';
+      const date = new Date(selectedDate);
+      const dateStr = `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+
+      if (selectedMember === 'all') {
+        // チーム全体の日報
+        message = generateTeamReport(teamMembers.map(m => m.name), projects, routineTasks, selectedDate);
+      } else {
+        // 個別メンバーの日報
+        message = `📊 日報 ${dateStr}\n━━━━━━━━━━━`;
+        message += generateMemberReport(selectedMember, projects, routineTasks, selectedDate);
+      }
+
+      // LINE送信
+      const result = await sendLineMessage(
+        lineSettings.channelAccessToken,
+        lineSettings.groupId,
+        message
+      );
+
+      if (result.success) {
+        setLineMessage({ type: 'success', text: '日報を送信しました！' });
+      } else {
+        throw new Error(result.error || '送信に失敗しました');
+      }
+    } catch (error) {
+      console.error('LINE送信エラー:', error);
+      setLineMessage({ type: 'error', text: `送信エラー: ${error.message}` });
+    } finally {
+      setIsSendingLine(false);
+      setTimeout(() => setLineMessage({ type: '', text: '' }), 5000);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ヘッダー */}
@@ -268,6 +321,17 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
 
           <div className="flex gap-2 ml-auto">
             <button
+              onClick={handleSendLine}
+              disabled={isSendingLine || !lineSettings.channelAccessToken}
+              className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${
+                darkMode ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600'
+              } text-white disabled:opacity-50 disabled:cursor-not-allowed`}
+              title={!lineSettings.channelAccessToken ? 'LINE設定が必要です' : 'LINEに送信'}
+            >
+              <Send size={18} />
+              {isSendingLine ? '送信中...' : 'LINE送信'}
+            </button>
+            <button
               onClick={handleCopy}
               className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'
                 } text-white relative`}
@@ -282,7 +346,7 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
             </button>
             <button
               onClick={handleDownload}
-              className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${darkMode ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600'
+              className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${darkMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-500 hover:bg-purple-600'
                 } text-white`}
             >
               <Download size={18} />
@@ -290,6 +354,19 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
             </button>
           </div>
         </div>
+
+        {/* ステータスメッセージ */}
+        {lineMessage.text && (
+          <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${
+            lineMessage.type === 'success'
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+              : lineMessage.type === 'error'
+              ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+              : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
+          }`}>
+            <span className="text-sm">{lineMessage.text}</span>
+          </div>
+        )}
       </div>
 
       {/* 統計サマリー */}
