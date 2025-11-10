@@ -9,7 +9,12 @@ import {
 /**
  * LINE Messaging API設定コンポーネント
  */
-export const LineNotifySettings = ({ darkMode, teamMembers, projects, routineTasks }) => {
+export const LineNotifySettings = ({
+  darkMode,
+  teamMembers = [],
+  projects = [],
+  routineTasks = {}
+}) => {
   const [settings, setSettings] = useState(getLineSettings());
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);

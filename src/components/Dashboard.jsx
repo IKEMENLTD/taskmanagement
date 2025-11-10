@@ -1000,6 +1000,9 @@ const Dashboard = () => {
           onClose={() => setShowSettings(false)}
           darkMode={darkMode}
           onDataRefresh={loadData}
+          teamMembers={teamMembers}
+          projects={projects}
+          routineTasks={routineTasks}
         />
       )}
 

@@ -11,11 +11,17 @@ import { getAllThemes, updateUserTheme } from '../../utils/themeUtils';
  * @param {Function} onClose - パネルを閉じるハンドラー
  * @param {boolean} darkMode - ダークモードフラグ
  * @param {Function} onDataRefresh - データ再読み込み関数
+ * @param {Array} teamMembers - チームメンバー一覧
+ * @param {Array} projects - プロジェクト一覧
+ * @param {Object} routineTasks - ルーティンタスク一覧
  */
 export const SettingsPanel = ({
   onClose,
   darkMode = false,
-  onDataRefresh
+  onDataRefresh,
+  teamMembers = [],
+  projects = [],
+  routineTasks = {}
 }) => {
   // 認証情報
   const { user, theme, setTheme } = useAuth();
