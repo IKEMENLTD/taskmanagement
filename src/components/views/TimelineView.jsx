@@ -282,7 +282,8 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
         color: formData.color,
         status: formData.status,
         progress: formData.progress,
-        timeline: formData.timeline
+        timeline: formData.timeline,
+        team: formData.team
       });
 
       if (error) {
@@ -305,7 +306,8 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
         color: formData.color,
         status: formData.status,
         progress: formData.progress,
-        timeline: formData.timeline
+        timeline: formData.timeline,
+        team: formData.team
       });
 
       if (error) {
