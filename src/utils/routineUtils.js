@@ -5,8 +5,8 @@ import { supabase } from '../lib/supabase';
  */
 
 /**
- * 指定日のルーティンタスクを取得
- * @param {string} userId - ユーザーID
+ * 指定日のルーティンタスクを取得（チーム全体）
+ * @param {string} userId - ユーザーID（互換性のために残すが使用しない）
  * @param {string} date - 日付 (YYYY-MM-DD)
  * @returns {Promise<{data: Array, error: any}>}
  */
@@ -15,7 +15,6 @@ export const getRoutineTasks = async (userId, date) => {
     const { data, error } = await supabase
       .from('routine_tasks')
       .select('*')
-      .eq('user_id', userId)
       .eq('date', date)
       .order('time', { ascending: true });
 
@@ -179,7 +178,6 @@ export const autoSkipPreviousDayTasks = async (userId, date) => {
         skip_reason: '日付変更により自動スキップ',
         updated_at: new Date().toISOString()
       })
-      .eq('user_id', userId)
       .eq('date', date)
       .eq('status', 'pending')
       .select();
@@ -198,8 +196,8 @@ export const autoSkipPreviousDayTasks = async (userId, date) => {
 };
 
 /**
- * 指定期間のルーティンタスク統計を取得
- * @param {string} userId - ユーザーID
+ * 指定期間のルーティンタスク統計を取得（チーム全体）
+ * @param {string} userId - ユーザーID（互換性のために残すが使用しない）
  * @param {string} startDate - 開始日 (YYYY-MM-DD)
  * @param {string} endDate - 終了日 (YYYY-MM-DD)
  * @returns {Promise<{data: Object, error: any}>}
@@ -209,7 +207,6 @@ export const getRoutineStats = async (userId, startDate, endDate) => {
     const { data, error } = await supabase
       .from('routine_tasks')
       .select('status')
-      .eq('user_id', userId)
       .gte('date', startDate)
       .lte('date', endDate);
 
