@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Send, Check, X, Clock, Users, HelpCircle, Edit2, Lock } from 'lucide-react';
+import { Bell, Send, Check, X, Clock, Users, HelpCircle, Edit2, Lock, RotateCcw } from 'lucide-react';
 import {
   getLineSettings,
   saveLineSettings,
@@ -84,6 +84,32 @@ export const LineNotifySettings = ({
     setSettings(originalSettings);
     setIsEditingCredentials(false);
     setMessage({ type: '', text: '' });
+  };
+
+  // 最終送信日をリセット
+  const handleResetLastSent = () => {
+    if (!window.confirm('最終送信日をリセットしますか？\n\nリセットすると、本日の自動送信が再度実行可能になります。')) {
+      return;
+    }
+
+    const updatedSettings = {
+      ...settings,
+      lastSentDate: null,
+      lastSentDateTime: null
+    };
+
+    const success = saveLineSettings(updatedSettings);
+
+    if (success) {
+      setSettings(updatedSettings);
+      setMessage({ type: 'success', text: '最終送信日をリセットしました。自動送信が再度実行可能です。' });
+    } else {
+      setMessage({ type: 'error', text: 'リセットに失敗しました' });
+    }
+
+    setTimeout(() => {
+      setMessage({ type: '', text: '' });
+    }, 5000);
   };
 
   // 保存
@@ -429,8 +455,26 @@ export const LineNotifySettings = ({
 
       {/* 最終送信日時 */}
       {(settings.lastSentDateTime || settings.lastSentDate) && (
-        <div className={`text-sm ${textSecondary} text-center`}>
-          最終送信: {settings.lastSentDateTime || settings.lastSentDate}
+        <div className={`${cardBg} rounded-lg border p-4`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className={`text-sm ${textSecondary}`}>最終送信日時</div>
+              <div className={`text-base ${textColor} font-medium mt-1`}>
+                {settings.lastSentDateTime || settings.lastSentDate}
+              </div>
+            </div>
+            <button
+              onClick={handleResetLastSent}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${textColor} transition-colors`}
+              title="最終送信日をリセット（テスト用）"
+            >
+              <RotateCcw size={16} />
+              リセット
+            </button>
+          </div>
+          <div className={`text-xs ${textSecondary} mt-2`}>
+            ※リセットすると本日の自動送信が再度実行可能になります（テスト用）
+          </div>
         </div>
       )}
 
