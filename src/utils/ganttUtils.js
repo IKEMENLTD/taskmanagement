@@ -13,42 +13,43 @@ export const generateDateRange = (startDate, endDate, viewMode = 'month') => {
   if (viewMode === 'week') {
     // 週表示：7日間
     const current = new Date(start);
-    // 終了日を含めるため、終了日の翌日と比較
-    const nextDay = new Date(end);
-    nextDay.setDate(nextDay.getDate() + 1);
-    while (current < nextDay) {
+    const endTime = new Date(end).getTime();
+
+    while (current.getTime() <= endTime) {
       dates.push(new Date(current));
       current.setDate(current.getDate() + 1);
     }
   } else if (viewMode === 'month') {
     // 月表示：日ごと
     const current = new Date(start);
-    // 終了日を含めるため、終了日の翌日と比較
-    const nextDay = new Date(end);
-    nextDay.setDate(nextDay.getDate() + 1);
-    while (current < nextDay) {
+    const endTime = new Date(end).getTime();
+
+    while (current.getTime() <= endTime) {
       dates.push(new Date(current));
       current.setDate(current.getDate() + 1);
     }
   } else if (viewMode === 'quarter') {
     // 四半期表示：週ごと
     const current = new Date(start);
-    // 終了日を含めるため、終了日の翌日と比較
-    const nextDay = new Date(end);
-    nextDay.setDate(nextDay.getDate() + 1);
-    while (current < nextDay) {
+    const endTime = new Date(end).getTime();
+
+    while (current.getTime() <= endTime) {
       dates.push(new Date(current));
       current.setDate(current.getDate() + 7);
     }
   } else if (viewMode === 'year') {
-    // 年表示：月ごと
-    const current = new Date(start);
-    // 終了日を含めるため、終了日の翌日と比較
-    const nextDay = new Date(end);
-    nextDay.setMonth(nextDay.getMonth() + 1);
-    while (current < nextDay) {
-      dates.push(new Date(current));
-      current.setMonth(current.getMonth() + 1);
+    // 年表示：月ごと（各月の1日を表示）
+    const startYear = start.getFullYear();
+    const endYear = end.getFullYear();
+    const endMonth = end.getMonth();
+
+    for (let year = startYear; year <= endYear; year++) {
+      const startMonth = (year === startYear) ? start.getMonth() : 0;
+      const lastMonth = (year === endYear) ? endMonth : 11;
+
+      for (let month = startMonth; month <= lastMonth; month++) {
+        dates.push(new Date(year, month, 1));
+      }
     }
   }
 
