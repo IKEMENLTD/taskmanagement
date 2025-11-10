@@ -23,7 +23,13 @@ export const getRoutineTasks = async (userId, date) => {
       return { data: null, error };
     }
 
-    return { data, error: null };
+    // データ変換: selected_days を selectedDays に変換
+    const convertedData = data?.map(task => ({
+      ...task,
+      selectedDays: task.selected_days || []
+    }));
+
+    return { data: convertedData, error: null };
   } catch (err) {
     console.error('ルーティンタスク取得エラー:', err);
     return { data: null, error: err };
@@ -49,6 +55,7 @@ export const createRoutineTask = async (userId, routineData) => {
         project_id: routineData.projectId || null,
         assignee: routineData.assignee || null,
         repeat: routineData.repeat || 'daily',
+        selected_days: routineData.selectedDays || [],
         duration: routineData.duration || 30,
         date: routineData.date,
         status: 'pending'

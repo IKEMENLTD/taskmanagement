@@ -286,6 +286,7 @@ export const RoutineView = ({
         projectId: formData.projectId,
         assignee: formData.assignee,
         repeat: formData.repeat,
+        selectedDays: formData.selectedDays || [],
         duration: formData.duration,
         date: today
       });
@@ -306,6 +307,7 @@ export const RoutineView = ({
         projectId: data.project_id || null,
         assignee: data.assignee,
         repeat: data.repeat,
+        selectedDays: data.selectedDays || [],
         duration: data.duration,
         date: data.date,
         status: data.status,
