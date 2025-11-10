@@ -32,7 +32,7 @@ export const exportAllData = async (userId) => {
     const { data: routineTasks, error: routineError } = await supabase
       .from('routine_tasks')
       .select('*')
-      .eq('created_by', userId)
+      .eq('user_id', userId)
       .order('created_at', { ascending: true });
 
     if (routineError) {
@@ -183,7 +183,7 @@ export const importAllData = async (userId, backupData, mode = 'replace') => {
             repeat: routine.repeat,
             selected_days: routine.selected_days || routine.selectedDays,
             time: routine.time,
-            created_by: userId
+            user_id: userId
           }]);
 
         if (!routineError) {
@@ -265,7 +265,7 @@ export const deleteAllUserData = async (userId) => {
     await supabase
       .from('routine_tasks')
       .delete()
-      .eq('created_by', userId);
+      .eq('user_id', userId);
 
     // ルーティン達成記録を削除
     await supabase
