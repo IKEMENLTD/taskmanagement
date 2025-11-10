@@ -56,29 +56,20 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
           }
 
           // 完了日がその日のタスク
-          if (task.completedDate === dateStr) {
+          if (task.completedDate === dateStr || task.completed_date === dateStr) {
             completedTasks.push({
               ...task,
               projectName: project.name,
               projectColor: project.color
             });
           }
-          // 進行中のタスク（activeまたはblocked）
-          else if (task.status === 'active' || task.status === 'blocked') {
-            // 開始日が設定されている場合は開始日以降のタスクのみ
-            // 開始日が未設定の場合はすべて表示
-            const isStarted = !task.startDate || task.startDate <= dateStr;
-            // 期限が設定されている場合は期限内のタスクのみ
-            // 期限が未設定の場合はすべて表示
-            const isWithinDeadline = !task.dueDate || task.dueDate >= dateStr;
-
-            if (isStarted && isWithinDeadline) {
-              updatedTasks.push({
-                ...task,
-                projectName: project.name,
-                projectColor: project.color
-              });
-            }
+          // 進行中・ブロック中のタスクをすべて表示（completedは除外）
+          else if (task.status !== 'completed') {
+            updatedTasks.push({
+              ...task,
+              projectName: project.name,
+              projectColor: project.color
+            });
           }
         });
       }
