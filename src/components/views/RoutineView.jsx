@@ -140,29 +140,9 @@ export const RoutineView = ({
   const routinesWithProject = localRoutines.filter(r => r.projectId);
   const routinesWithoutProject = localRoutines.filter(r => !r.projectId);
 
-  // カテゴリー別にグループ化
-  const groupedRoutines = {
-    work: routinesWithoutProject.filter(r => r.category === 'work'),
-    health: routinesWithoutProject.filter(r => r.category === 'health'),
-    personal: routinesWithoutProject.filter(r => r.category === 'personal'),
-  };
-
-  // ドロップ時のハンドラー（プロジェクト紐付きルーティン用）
+  // ドロップ時のハンドラー（全ルーティン共通）
   const handleDropProject = (draggedItem, targetItem) => {
     if (!draggedItem || !targetItem) return;
-
-    const newRoutines = reorderItems(localRoutines, draggedItem, targetItem);
-    setLocalRoutines(newRoutines);
-
-    // 親コンポーネントに通知（オプション）
-    if (onReorderRoutines) {
-      onReorderRoutines(newRoutines);
-    }
-  };
-
-  // ドロップ時のハンドラー（カテゴリー別ルーティン用）
-  const handleDropCategory = (category) => (draggedItem, targetItem) => {
-    if (!draggedItem || !targetItem || draggedItem.category !== category) return;
 
     const newRoutines = reorderItems(localRoutines, draggedItem, targetItem);
     setLocalRoutines(newRoutines);
@@ -554,39 +534,21 @@ export const RoutineView = ({
             <Clock size={20} />
             デイリールーティン（ドラッグで並び替え可能）
           </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {Object.entries(groupedRoutines).map(([category, tasks]) => {
-              if (tasks.length === 0) return null;
-
-              return (
-                <div key={category} className={`${cardBg} rounded-xl p-5 border`}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h4 className={`font-bold ${textColor}`}>
-                      {getCategoryText(category)}
-                    </h4>
-                    <span className={`text-sm ${textSecondary}`}>
-                      {tasks.filter(t => t.completed).length}/{tasks.length}
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    {tasks.map(routine => (
-                      <RoutineCard
-                        key={routine.id}
-                        routine={routine}
-                        onToggle={onToggleRoutine}
-                        onSkip={onSkipRoutine}
-                        onClick={() => openDetailModal(routine)}
-                        showAssignee={viewMode === 'team'}
-                        darkMode={darkMode}
-                        isDraggable={true}
-                        draggableProps={getDraggableProps(routine, handleDropCategory(category))}
-                        dropZoneStyle={getDropZoneStyle(routine, darkMode)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+          <div className="space-y-2">
+            {routinesWithoutProject.map(routine => (
+              <RoutineCard
+                key={routine.id}
+                routine={routine}
+                onToggle={onToggleRoutine}
+                onSkip={onSkipRoutine}
+                onClick={() => openDetailModal(routine)}
+                showAssignee={viewMode === 'team'}
+                darkMode={darkMode}
+                isDraggable={true}
+                draggableProps={getDraggableProps(routine, handleDropProject)}
+                dropZoneStyle={getDropZoneStyle(routine, darkMode)}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -704,20 +666,17 @@ export const RoutineView = ({
                     <label className={`block text-sm font-medium ${textColor} mb-1`}>
                       🏷️ カテゴリー
                     </label>
-                    <input
-                      type="text"
-                      list="category-suggestions"
-                      placeholder="カテゴリーを入力または選択"
+                    <select
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                       className={`w-full px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                    />
-                    <datalist id="category-suggestions">
+                    >
+                      <option value="">カテゴリーを選択してください</option>
                       {routineCategories.map((category, index) => (
                         <option key={index} value={category}>{category}</option>
                       ))}
-                    </datalist>
-                    <p className={`text-xs ${textSecondary} mt-1`}>自由に入力できます</p>
+                    </select>
+                    <p className={`text-xs ${textSecondary} mt-1`}>カテゴリーは下の「カテゴリー管理」で追加できます</p>
                   </div>
 
                   {/* 繰り返し */}
