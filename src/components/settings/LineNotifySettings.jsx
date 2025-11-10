@@ -289,7 +289,7 @@ export const LineNotifySettings = ({
 
       {/* 有効/無効トグル */}
       <div className={`${cardBg} rounded-lg border p-4`}>
-        <label className="flex items-center justify-between cursor-pointer">
+        <div className="flex items-center justify-between">
           <div>
             <div className={`font-semibold ${textColor}`}>LINE通知を有効化</div>
             <div className={`text-sm ${textSecondary} mt-1`}>
@@ -297,14 +297,8 @@ export const LineNotifySettings = ({
             </div>
           </div>
           <div className="relative">
-            <input
-              type="checkbox"
-              checked={settings.enabled}
-              onChange={(e) => handleChange('enabled', e.target.checked)}
-              className="sr-only"
-            />
             <div
-              className={`w-14 h-8 rounded-full transition-colors ${
+              className={`w-14 h-8 rounded-full transition-colors cursor-pointer ${
                 settings.enabled ? 'bg-green-500' : darkMode ? 'bg-gray-600' : 'bg-gray-300'
               }`}
               onClick={() => handleChange('enabled', !settings.enabled)}
@@ -316,7 +310,7 @@ export const LineNotifySettings = ({
               />
             </div>
           </div>
-        </label>
+        </div>
       </div>
 
       {/* 送信時刻 */}
