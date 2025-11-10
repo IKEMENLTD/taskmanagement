@@ -134,12 +134,12 @@ export const DataManagementPanel = ({
       return;
     }
 
-    const confirmation = window.prompt(
-      '⚠️ 警告：全てのデータが完全に削除されます。\n\nこの操作は取り消せません。続行する場合は「削除」と入力してください。'
+    const password = window.prompt(
+      '⚠️ 警告：全てのデータが完全に削除されます。\n\nこの操作は取り消せません。続行する場合はパスワードを入力してください。'
     );
 
-    if (confirmation !== '削除') {
-      setImportStatus({ type: 'info', message: 'キャンセルしました' });
+    if (password !== 'Akutu4256') {
+      setImportStatus({ type: 'error', message: 'パスワードが正しくありません' });
       setTimeout(() => setImportStatus(null), 3000);
       return;
     }
