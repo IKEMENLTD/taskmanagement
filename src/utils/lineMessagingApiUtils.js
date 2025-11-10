@@ -247,16 +247,25 @@ export const shouldSendReport = (scheduledTime, lastSentDate) => {
 
   // 今日既に送信済みの場合はスキップ
   if (lastSentDate === today) {
+    console.log('[LINE通知] 今日は既に送信済みです');
     return false;
   }
 
-  // 現在時刻を取得
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-  // スケジュール時刻と一致するかチェック（1分の誤差を許容）
+  // 現在時刻と設定時刻を分単位で比較
   const [schedHour, schedMin] = scheduledTime.split(':').map(Number);
   const currentHour = now.getHours();
   const currentMin = now.getMinutes();
 
-  return schedHour === currentHour && Math.abs(schedMin - currentMin) <= 1;
+  // 設定時刻を分に変換
+  const scheduledMinutes = schedHour * 60 + schedMin;
+  const currentMinutes = currentHour * 60 + currentMin;
+
+  // 設定時刻を過ぎていて、まだ送信していない場合に送信
+  const shouldSend = currentMinutes >= scheduledMinutes;
+
+  if (shouldSend) {
+    console.log(`[LINE通知] 送信時刻になりました (設定: ${scheduledTime}, 現在: ${String(currentHour).padStart(2, '0')}:${String(currentMin).padStart(2, '0')})`);
+  }
+
+  return shouldSend;
 };

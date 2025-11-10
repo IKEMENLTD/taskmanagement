@@ -27,9 +27,11 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
 
       // トークンまたはメンバーが設定されていない場合はスキップ
       if (!settings.channelAccessToken || !settings.groupId || settings.selectedMembers.length === 0) {
-        console.warn('LINE Messaging API: トークン、グループID、またはメンバーが設定されていません');
+        console.warn('[LINE通知] トークン、グループID、またはメンバーが設定されていません');
         return;
       }
+
+      console.log(`[LINE通知] チェック実行 - 設定時刻: ${settings.scheduledTime}, 最終送信日: ${settings.lastSentDate || 'なし'}`);
 
       // 送信すべき時刻かチェック
       if (!shouldSendReport(settings.scheduledTime, settings.lastSentDate)) {
@@ -38,14 +40,16 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
 
       // 重複送信を防ぐため、最後のチェック時刻を確認
       const now = new Date();
-      const currentMinute = `${now.getHours()}:${now.getMinutes()}`;
+      const today = now.toISOString().split('T')[0];
+      const currentMinute = `${today}_${now.getHours()}:${now.getMinutes()}`;
 
       if (lastCheckRef.current === currentMinute) {
+        console.log('[LINE通知] 同じ分で既にチェック済みのためスキップ');
         return; // 同じ分には1回だけ実行
       }
       lastCheckRef.current = currentMinute;
 
-      console.log('LINE Messaging API: 日報を送信中...');
+      console.log('[LINE通知] 日報を送信中...');
 
       try {
         // 日報を生成
@@ -60,7 +64,7 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
         const result = await sendLineMessage(settings.channelAccessToken, settings.groupId, report);
 
         if (result.success) {
-          console.log('LINE Messaging API: 日報送信成功');
+          console.log('[LINE通知] ✅ 日報送信成功');
 
           // 最終送信日時を更新
           const now = new Date();
@@ -72,11 +76,12 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
             lastSentDateTime: dateTimeString
           };
           saveLineSettings(updatedSettings);
+          console.log(`[LINE通知] 最終送信日時を更新: ${dateTimeString}`);
         } else {
-          console.error('LINE Messaging API: 日報送信失敗', result.error);
+          console.error('[LINE通知] ❌ 日報送信失敗:', result.error);
         }
       } catch (error) {
-        console.error('LINE Messaging API: エラーが発生しました', error);
+        console.error('[LINE通知] ❌ エラーが発生しました:', error);
       }
     };
 
@@ -84,8 +89,12 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
     const interval = setInterval(checkAndSend, 60000);
 
     // 初回チェック
+    console.log('[LINE通知] スケジューラー起動 - 1分ごとにチェックを開始');
     checkAndSend();
 
-    return () => clearInterval(interval);
+    return () => {
+      console.log('[LINE通知] スケジューラー停止');
+      clearInterval(interval);
+    };
   }, [projects, routineTasks]);
 };
