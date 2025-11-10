@@ -115,6 +115,16 @@ export const formatDateForGantt = (date, viewMode) => {
 };
 
 /**
+ * 日付をローカル時間でYYYY-MM-DD形式に変換
+ */
+const formatLocalDate = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+/**
  * 表示期間の開始日・終了日を取得
  */
 export const getViewRange = (viewMode, baseDate = new Date()) => {
@@ -131,16 +141,15 @@ export const getViewRange = (viewMode, baseDate = new Date()) => {
   } else if (viewMode === 'month') {
     // 今月の1日から末日
     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-    // 翌月の1日の前日を取得（月末）
-    endDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    endDate.setDate(endDate.getDate() - 1);
+    // 翌月の0日 = 今月の最終日
+    endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     console.log('🗓️ Month View Range Debug:');
-    console.log('  baseDate:', today.toISOString());
+    console.log('  baseDate:', formatLocalDate(today));
     console.log('  year:', today.getFullYear());
     console.log('  month (0-indexed):', today.getMonth());
-    console.log('  startDate:', startDate.toISOString());
-    console.log('  endDate:', endDate.toISOString());
+    console.log('  startDate:', formatLocalDate(startDate));
+    console.log('  endDate:', formatLocalDate(endDate));
   } else if (viewMode === 'quarter') {
     // 今四半期
     const quarter = Math.floor(today.getMonth() / 3);
@@ -153,8 +162,8 @@ export const getViewRange = (viewMode, baseDate = new Date()) => {
   }
 
   const result = {
-    startDate: startDate.toISOString().split('T')[0],
-    endDate: endDate.toISOString().split('T')[0]
+    startDate: formatLocalDate(startDate),
+    endDate: formatLocalDate(endDate)
   };
 
   console.log('📅 Final Range:', result);
@@ -166,8 +175,9 @@ export const getViewRange = (viewMode, baseDate = new Date()) => {
  * タスクが遅延しているか判定
  */
 export const isTaskDelayed = (task) => {
-  const today = new Date().toISOString().split('T')[0];
-  return task.dueDate < today && task.status !== 'completed';
+  const today = new Date();
+  const todayStr = formatLocalDate(today);
+  return task.dueDate < todayStr && task.status !== 'completed';
 };
 
 /**
@@ -204,9 +214,10 @@ export const getProjectDateRange = (projects) => {
     }
   });
 
+  const today = new Date();
   return {
-    startDate: minDate ? minDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-    endDate: maxDate ? maxDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+    startDate: minDate ? formatLocalDate(minDate) : formatLocalDate(today),
+    endDate: maxDate ? formatLocalDate(maxDate) : formatLocalDate(today)
   };
 };
 
@@ -222,7 +233,10 @@ export const isWeekend = (date) => {
  * 今日かどうか判定
  */
 export const isToday = (date) => {
-  const today = new Date().toISOString().split('T')[0];
-  const checkDate = new Date(date).toISOString().split('T')[0];
-  return today === checkDate;
+  const today = new Date();
+  const checkDate = new Date(date);
+
+  return today.getFullYear() === checkDate.getFullYear() &&
+         today.getMonth() === checkDate.getMonth() &&
+         today.getDate() === checkDate.getDate();
 };
