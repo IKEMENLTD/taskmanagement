@@ -13,6 +13,10 @@ import {
   getRoutineTasks,
   shouldRoutineRunOnDate
 } from '../../utils/routineUtils';
+import {
+  createRoutineCategory,
+  deleteRoutineCategory
+} from '../../utils/routineCategoryUtils';
 
 /**
  * ルーティンビューコンポーネント
@@ -85,16 +89,69 @@ export const RoutineView = ({
   const [newCategoryInput, setNewCategoryInput] = useState('');
 
   // カテゴリー追加
-  const handleAddCategory = () => {
-    if (newCategoryInput.trim() && !routineCategories.includes(newCategoryInput.trim())) {
-      setRoutineCategories([...routineCategories, newCategoryInput.trim()]);
-      setNewCategoryInput('');
+  const handleAddCategory = async () => {
+    const categoryName = newCategoryInput.trim();
+    if (!categoryName) return;
+
+    // 既に存在するか確認（オブジェクトの場合と文字列の場合の両方に対応）
+    const exists = routineCategories.some(c =>
+      typeof c === 'string' ? c === categoryName : c.name === categoryName
+    );
+
+    if (exists) {
+      alert('このカテゴリーは既に存在します');
+      return;
     }
+
+    // Supabaseに保存
+    const { data, error } = await createRoutineCategory({
+      name: categoryName
+    });
+
+    if (error) {
+      console.error('カテゴリー追加エラー:', error);
+      alert('カテゴリーの追加に失敗しました');
+      return;
+    }
+
+    // ローカル状態を更新（リアルタイム同期があるが、即座にUIに反映するため）
+    setRoutineCategories([...routineCategories, data]);
+    setNewCategoryInput('');
   };
 
   // カテゴリー削除
-  const handleRemoveCategory = (categoryToRemove) => {
-    setRoutineCategories(routineCategories.filter(c => c !== categoryToRemove));
+  const handleRemoveCategory = async (categoryToRemove) => {
+    // オブジェクトか文字列かを判定
+    const categoryId = typeof categoryToRemove === 'string'
+      ? routineCategories.find(c => typeof c !== 'string' && c.name === categoryToRemove)?.id
+      : categoryToRemove.id;
+    const categoryName = typeof categoryToRemove === 'string'
+      ? categoryToRemove
+      : categoryToRemove.name;
+
+    if (!categoryId) {
+      // IDがない場合は文字列のカテゴリー（古いデータ）
+      setRoutineCategories(routineCategories.filter(c => c !== categoryToRemove));
+      return;
+    }
+
+    if (!window.confirm(`カテゴリー「${categoryName}」を削除しますか？`)) {
+      return;
+    }
+
+    // Supabaseから削除
+    const { error } = await deleteRoutineCategory(categoryId);
+
+    if (error) {
+      console.error('カテゴリー削除エラー:', error);
+      alert('カテゴリーの削除に失敗しました');
+      return;
+    }
+
+    // ローカル状態を更新
+    setRoutineCategories(routineCategories.filter(c =>
+      typeof c === 'string' ? c !== categoryName : c.id !== categoryId
+    ));
   };
 
   // ドラッグ&ドロップフック
@@ -716,9 +773,12 @@ export const RoutineView = ({
                       className={`w-full px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                     >
                       <option value="">カテゴリーを選択してください</option>
-                      {routineCategories.map((category, index) => (
-                        <option key={index} value={category}>{category}</option>
-                      ))}
+                      {routineCategories.map((category, index) => {
+                        const categoryName = typeof category === 'string' ? category : category.name;
+                        return (
+                          <option key={index} value={categoryName}>{categoryName}</option>
+                        );
+                      })}
                     </select>
                     <p className={`text-xs ${textSecondary} mt-1`}>カテゴリーは下の「カテゴリー管理」で追加できます</p>
                   </div>
@@ -859,20 +919,23 @@ export const RoutineView = ({
                   {/* カテゴリータグ一覧 */}
                   {routineCategories.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
-                      {routineCategories.map((category, index) => (
-                        <span
-                          key={index}
-                          className={`px-3 py-1 rounded-full text-sm ${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'} flex items-center gap-2`}
-                        >
-                          {category}
-                          <button
-                            onClick={() => handleRemoveCategory(category)}
-                            className={`${textSecondary} hover:text-red-500 transition-colors`}
+                      {routineCategories.map((category, index) => {
+                        const categoryName = typeof category === 'string' ? category : category.name;
+                        return (
+                          <span
+                            key={index}
+                            className={`px-3 py-1 rounded-full text-sm ${darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800'} flex items-center gap-2`}
                           >
-                            <X size={14} />
-                          </button>
-                        </span>
-                      ))}
+                            {categoryName}
+                            <button
+                              onClick={() => handleRemoveCategory(category)}
+                              className={`${textSecondary} hover:text-red-500 transition-colors`}
+                            >
+                              <X size={14} />
+                            </button>
+                          </span>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className={`text-sm ${textSecondary}`}>カテゴリーがありません。追加してください。</p>

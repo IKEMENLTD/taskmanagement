@@ -1,6 +1,27 @@
 import React, { useState } from 'react';
 import { Clock, CheckCircle, Target, User, Calendar, X, Edit, Trash2, History } from 'lucide-react';
-import { getCategoryColor, getCategoryText, getRepeatText } from '../../utils/colorUtils';
+import { getCategoryColor, getCategoryText } from '../../utils/colorUtils';
+
+/**
+ * 繰り返しテキストを取得
+ */
+const getRepeatText = (routine) => {
+  if (routine.repeat === 'daily') return '毎日';
+  if (routine.repeat === 'weekday') return '平日';
+  if (routine.repeat === 'weekend') return '週末';
+
+  // カスタム繰り返し: selected_days（スネークケース）も確認
+  const selectedDays = routine.selectedDays || routine.selected_days;
+  if (routine.repeat === 'custom' && selectedDays && selectedDays.length > 0) {
+    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    // 文字列と数値の両方に対応
+    return selectedDays.map(day => {
+      const index = typeof day === 'string' ? parseInt(day, 10) : day;
+      return dayNames[index];
+    }).join('・');
+  }
+  return 'カスタム';
+};
 
 /**
  * ルーティン詳細モーダルコンポーネント
@@ -136,7 +157,7 @@ export const RoutineDetailModal = ({
                 )}
                 <span className="flex items-center gap-1">
                   <Calendar size={14} />
-                  {getRepeatText(routine.repeat)}
+                  {getRepeatText(routine)}
                 </span>
               </div>
             </div>
@@ -178,7 +199,7 @@ export const RoutineDetailModal = ({
               <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
                 <div className={`text-sm ${textSecondary} mb-1`}>繰り返し</div>
                 <div className={`text-2xl font-bold ${textColor} mb-1`}>
-                  {getRepeatText(routine.repeat)}
+                  {getRepeatText(routine)}
                 </div>
                 <div className={`text-xs ${textSecondary}`}>
                   {routine.repeat === 'daily' ? '毎日実行' :

@@ -34,16 +34,10 @@ export const getAllRoutineCategories = async () => {
  */
 export const createRoutineCategory = async (categoryData) => {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-
     const { data, error } = await supabase
       .from('routine_categories')
       .insert([{
-        name: categoryData.name,
-        color: categoryData.color || '#3b82f6',
-        icon: categoryData.icon || null,
-        description: categoryData.description || null,
-        created_by: user?.id
+        name: categoryData.name
       }])
       .select()
       .single();
