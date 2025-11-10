@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { Clock, CheckCircle, Target, GripVertical, XCircle } from 'lucide-react';
 import { getCategoryColor, getCategoryText } from '../../utils/colorUtils';
+import { shouldRoutineRunOnDate } from '../../utils/routineUtils';
 
 /**
  * 繰り返しテキストを取得
@@ -31,6 +32,7 @@ const getRepeatText = (routine) => {
  * @param {Function} onClick - クリックハンドラー
  * @param {boolean} showAssignee - 担当者名を表示するか
  * @param {boolean} darkMode - ダークモードフラグ
+ * @param {Date} currentTime - 現在時刻（曜日判定用）
  * @param {Object} draggableProps - ドラッグ用のprops（オプション）
  * @param {string} dropZoneStyle - ドロップゾーンのスタイル（オプション）
  * @param {boolean} isDraggable - ドラッグ可能かどうか（デフォルト: false）
@@ -42,6 +44,7 @@ const RoutineCardComponent = ({
   onClick,
   showAssignee = false,
   darkMode = false,
+  currentTime = new Date(),
   draggableProps = {},
   dropZoneStyle = '',
   isDraggable = false
@@ -50,10 +53,16 @@ const RoutineCardComponent = ({
   const isCompleted = routine.completed || routine.status === 'completed';
   const isSkipped = routine.status === 'skipped';
   const isPending = !isCompleted && !isSkipped;
+
+  // 今日実行されるべきルーティンかどうか
+  const isActiveToday = shouldRoutineRunOnDate(routine, currentTime);
+  const isInactive = !isActiveToday;
   return (
     <div
       className={`${
-        isSkipped
+        isInactive
+          ? darkMode ? 'bg-gray-800 opacity-40' : 'bg-gray-100 opacity-50'
+          : isSkipped
           ? darkMode ? 'bg-gray-800 opacity-60' : 'bg-gray-100 opacity-70'
           : darkMode ? 'bg-gray-700' : 'bg-gray-50'
       } rounded-lg p-3 hover:bg-opacity-80 transition-all cursor-pointer border-2 border-transparent ${dropZoneStyle}`}
@@ -73,14 +82,16 @@ const RoutineCardComponent = ({
           checked={isCompleted}
           onChange={() => onToggle(routine.id)}
           onClick={(e) => e.stopPropagation()}
-          disabled={isSkipped}
+          disabled={isSkipped || isInactive}
           className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         />
 
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className={`font-medium ${
-              isCompleted
+              isInactive
+                ? 'text-gray-400'
+                : isCompleted
                 ? 'line-through text-gray-400'
                 : isSkipped
                 ? 'line-through text-gray-500'
@@ -88,6 +99,12 @@ const RoutineCardComponent = ({
             }`}>
               {routine.name}
             </span>
+
+            {isInactive && (
+              <span className="px-2 py-0.5 rounded text-xs bg-gray-400 text-white">
+                今日は実行されません
+              </span>
+            )}
 
             <span className={`px-2 py-0.5 rounded text-xs text-white ${getCategoryColor(routine.category)}`}>
               {getCategoryText(routine.category)}
@@ -136,15 +153,15 @@ const RoutineCardComponent = ({
           </div>
         </div>
 
-        {isCompleted && !isSkipped && (
+        {isCompleted && !isSkipped && !isInactive && (
           <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
         )}
 
-        {isSkipped && (
+        {isSkipped && !isInactive && (
           <XCircle size={18} className="text-gray-500 flex-shrink-0" />
         )}
 
-        {isPending && onSkip && (
+        {isPending && onSkip && !isInactive && (
           <button
             onClick={(e) => {
               e.stopPropagation();

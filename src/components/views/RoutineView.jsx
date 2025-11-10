@@ -100,7 +100,7 @@ export const RoutineView = ({
   // ドラッグ&ドロップフック
   const { getDraggableProps, getDropZoneStyle, reorderItems } = useDragAndDrop();
 
-  // フィルター済みルーティンを取得（曜日フィルタリング含む）
+  // フィルター済みルーティンを取得
   const filteredRoutines = useMemo(() => {
     let result = routines;
 
@@ -112,17 +112,19 @@ export const RoutineView = ({
       });
     }
 
-    // 曜日フィルタリング: 今日実行されるべきルーティンのみを表示
-    result = result.filter(routine => shouldRoutineRunOnDate(routine, currentTime));
+    // 曜日フィルタリングは削除：すべてのルーティンを表示し、RoutineCardでグレーアウト処理
 
     return result;
   }, [routines, currentTime, viewMode, filterMember, filterProject, getFilteredRoutines]);
 
-  // フィルター済みルーティンの統計を計算（曜日フィルタリング後）
+  // フィルター済みルーティンの統計を計算（今日実行されるルーティンのみ）
   const filteredStats = useMemo(() => {
-    const completed = filteredRoutines.filter(r => r.completed || r.status === 'completed').length;
-    const skipped = filteredRoutines.filter(r => r.status === 'skipped').length;
-    const total = filteredRoutines.length;
+    // 今日実行されるルーティンのみを対象に統計を計算
+    const todayRoutines = filteredRoutines.filter(r => shouldRoutineRunOnDate(r, currentTime));
+
+    const completed = todayRoutines.filter(r => r.completed || r.status === 'completed').length;
+    const skipped = todayRoutines.filter(r => r.status === 'skipped').length;
+    const total = todayRoutines.length;
     const pending = total - completed - skipped;
 
     // スキップを除外した達成率
@@ -136,7 +138,7 @@ export const RoutineView = ({
       total,
       completionRate: rate
     };
-  }, [filteredRoutines]);
+  }, [filteredRoutines, currentTime]);
 
   // ローカル状態でルーティンを管理（ドラッグ中の並び替えを反映）
   const [localRoutines, setLocalRoutines] = useState(filteredRoutines);
@@ -250,6 +252,7 @@ export const RoutineView = ({
         project_id: formData.projectId,
         assignee: formData.assignee,
         repeat: formData.repeat,
+        selected_days: formData.selectedDays || [],
         duration: formData.duration
       });
 
@@ -271,6 +274,7 @@ export const RoutineView = ({
               projectId: formData.projectId,
               assignee: formData.assignee,
               repeat: formData.repeat,
+              selectedDays: formData.selectedDays || [],
               duration: formData.duration
             }
           : r
@@ -355,6 +359,7 @@ export const RoutineView = ({
       project_id: updatedRoutine.projectId,
       assignee: updatedRoutine.assignee,
       repeat: updatedRoutine.repeat,
+      selected_days: updatedRoutine.selectedDays || [],
       duration: updatedRoutine.duration
     });
 
@@ -555,6 +560,7 @@ export const RoutineView = ({
                 onClick={() => openDetailModal(routine)}
                 showAssignee={viewMode === 'team'}
                 darkMode={darkMode}
+                currentTime={currentTime}
                 isDraggable={true}
                 draggableProps={getDraggableProps(routine, handleDropProject)}
                 dropZoneStyle={getDropZoneStyle(routine, darkMode)}
@@ -581,6 +587,7 @@ export const RoutineView = ({
                 onClick={() => openDetailModal(routine)}
                 showAssignee={viewMode === 'team'}
                 darkMode={darkMode}
+                currentTime={currentTime}
                 isDraggable={true}
                 draggableProps={getDraggableProps(routine, handleDropProject)}
                 dropZoneStyle={getDropZoneStyle(routine, darkMode)}
