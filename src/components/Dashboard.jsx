@@ -12,7 +12,6 @@ import { defaultNotificationSettings } from '../utils/notificationUtils';
 import { isMobileBrowser } from '../utils/deviceUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { signOut } from '../utils/authUtils';
-import { getRoleLabel } from '../utils/permissionUtils';
 import { skipRoutineTask, autoSkipPreviousDayTasks, getRoutineTasks, completeRoutineTask, resetRoutineTask } from '../utils/routineUtils';
 import { getAllProjects, createProject, updateProject, deleteProject, createTask, updateTask, deleteTask } from '../utils/projectUtils';
 import { getAllTeamMembers, createTeamMember, updateTeamMember, deleteTeamMember } from '../utils/teamMemberUtils';
@@ -44,7 +43,7 @@ import { useLineNotifyScheduler } from '../hooks/useLineNotifyScheduler';
  */
 const Dashboard = () => {
   // 認証情報
-  const { user, role } = useAuth();
+  const { user } = useAuth();
 
   // 時刻管理
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -804,9 +803,6 @@ const Dashboard = () => {
                 <div className="flex items-center gap-2 px-3 py-2 rounded-lg btn-primary">
                   <div className="text-right">
                     <p className="text-sm font-medium text-white">{user.email}</p>
-                    {role && (
-                      <p className="text-xs text-white opacity-90">{getRoleLabel(role)}</p>
-                    )}
                   </div>
                 </div>
               )}

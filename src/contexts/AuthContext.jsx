@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChange, getCurrentUser } from '../utils/authUtils';
-import { getUserRole } from '../utils/permissionUtils';
 import { getUserTheme, applyThemeColors } from '../utils/themeUtils';
 
 /**
@@ -25,21 +24,8 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
-  const [role, setRole] = useState(null);
   const [theme, setTheme] = useState('default');
   const [loading, setLoading] = useState(true);
-
-  // ユーザーのロールを取得
-  const fetchUserRole = async (userId) => {
-    if (!userId) {
-      setRole(null);
-      return;
-    }
-
-    const userRole = await getUserRole(userId);
-    setRole(userRole);
-    console.log('🔑 ユーザーロール:', userRole);
-  };
 
   // ユーザーのテーマを取得して適用
   const fetchUserTheme = async (userId) => {
@@ -64,7 +50,6 @@ export const AuthProvider = ({ children }) => {
 
       if (currentUser) {
         console.log('✅ ログイン済み:', currentUser.email);
-        await fetchUserRole(currentUser.id);
         await fetchUserTheme(currentUser.id);
       } else {
         console.log('⚠️ 未ログイン');
@@ -88,16 +73,14 @@ export const AuthProvider = ({ children }) => {
         setUser(newSession?.user || null);
         setSession(newSession);
 
-        // ロール、テーマを取得
+        // テーマを取得
         if (newSession?.user) {
-          await fetchUserRole(newSession.user.id);
           await fetchUserTheme(newSession.user.id);
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 ログアウトしました');
         setUser(null);
         setSession(null);
-        setRole(null);
         setTheme('default');
         applyThemeColors('default');
       } else if (event === 'TOKEN_REFRESHED') {
@@ -119,7 +102,6 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     session,
-    role,
     theme,
     setTheme: (newTheme) => {
       setTheme(newTheme);
