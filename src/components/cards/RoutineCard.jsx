@@ -11,7 +11,11 @@ const getRepeatText = (routine) => {
   if (routine.repeat === 'weekend') return '週末';
   if (routine.repeat === 'custom' && routine.selectedDays && routine.selectedDays.length > 0) {
     const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-    return routine.selectedDays.map(day => dayNames[day]).join('・');
+    // 文字列と数値の両方に対応
+    return routine.selectedDays.map(day => {
+      const index = typeof day === 'string' ? parseInt(day, 10) : day;
+      return dayNames[index];
+    }).join('・');
   }
   return 'カスタム';
 };

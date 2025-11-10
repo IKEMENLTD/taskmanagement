@@ -23,10 +23,12 @@ export const getRoutineTasks = async (userId, date) => {
       return { data: null, error };
     }
 
-    // データ変換: selected_days を selectedDays に変換
+    // データ変換: selected_days を selectedDays に変換（文字列→数値）
     const convertedData = data?.map(task => ({
       ...task,
-      selectedDays: task.selected_days || []
+      selectedDays: (task.selected_days || []).map(day =>
+        typeof day === 'string' ? parseInt(day, 10) : day
+      )
     }));
 
     return { data: convertedData, error: null };
@@ -271,7 +273,11 @@ export const shouldRoutineRunOnDate = (routine, date) => {
 
   if (routine.repeat === 'custom' && routine.selectedDays && routine.selectedDays.length > 0) {
     // カスタム（選択された曜日）
-    return routine.selectedDays.includes(dayOfWeek);
+    // 文字列と数値の両方に対応
+    return routine.selectedDays.some(day => {
+      const numDay = typeof day === 'string' ? parseInt(day, 10) : day;
+      return numDay === dayOfWeek;
+    });
   }
 
   // その他の場合はデフォルトでtrue（後方互換性のため）
