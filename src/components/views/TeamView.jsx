@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Users, Plus, X, Edit, Trash2 } from 'lucide-react';
 import { MemberCard } from '../cards/MemberCard';
 import { useAuth } from '../../contexts/AuthContext';
-import { canAddMember, canDeleteMember } from '../../utils/permissionUtils';
 import { createTeamMember, updateTeamMember, deleteTeamMember } from '../../utils/teamMemberUtils';
 
 /**
@@ -16,7 +15,7 @@ import { createTeamMember, updateTeamMember, deleteTeamMember } from '../../util
  */
 export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode = false, projects = [], routineTasks = {} }) => {
   // 認証情報
-  const { user, role } = useAuth();
+  const { user } = useAuth();
 
   const cardBg = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
   const textColor = darkMode ? 'text-gray-100' : 'text-gray-900';
@@ -336,15 +335,13 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
             チーム全体の稼働状況と負荷を確認できます
           </p>
         </div>
-        {canAddMember(role) && (
-          <button
-            onClick={openAddModal}
-            className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
-          >
-            <Plus size={18} />
-            メンバー追加
-          </button>
-        )}
+        <button
+          onClick={openAddModal}
+          className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+        >
+          <Plus size={18} />
+          メンバー追加
+        </button>
       </div>
 
       {/* メンバーカードグリッド */}
@@ -657,31 +654,27 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
 
               {/* フッター */}
               <div className={`p-6 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
-                {canDeleteMember(role) && (
-                  <button
-                    onClick={() => handleDelete(selectedMember.name)}
-                    className={`${darkMode ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'} text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition-all`}
-                  >
-                    <Trash2 size={16} />
-                    削除
-                  </button>
-                )}
-                <div className={`flex gap-2 ${!canDeleteMember(role) ? 'ml-auto' : ''}`}>
+                <button
+                  onClick={() => handleDelete(selectedMember.name)}
+                  className={`${darkMode ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'} text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition-all`}
+                >
+                  <Trash2 size={16} />
+                  削除
+                </button>
+                <div className="flex gap-2">
                   <button
                     onClick={closeDetailModal}
                     className={`px-6 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${textColor} py-2 rounded-lg transition-colors font-medium`}
                   >
                     閉じる
                   </button>
-                  {canAddMember(role) && (
-                    <button
-                      onClick={() => handleEditFromDetail(selectedMember)}
-                      className={`${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white px-6 py-2 rounded-lg transition-colors font-medium flex items-center gap-2`}
-                    >
-                      <Edit size={16} />
-                      編集
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleEditFromDetail(selectedMember)}
+                    className={`${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white px-6 py-2 rounded-lg transition-colors font-medium flex items-center gap-2`}
+                  >
+                    <Edit size={16} />
+                    編集
+                  </button>
                 </div>
               </div>
             </div>
