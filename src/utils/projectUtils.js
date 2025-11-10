@@ -287,3 +287,103 @@ export const deleteTask = async (taskId) => {
     return { data: null, error: err };
   }
 };
+
+/**
+ * 全タスクの開始日を一括更新
+ * @param {string} startDate - 設定する開始日（YYYY-MM-DD形式）
+ * @returns {Promise<{data: {updated: number, total: number}, error: any}>}
+ */
+export const bulkUpdateTaskStartDates = async (startDate) => {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { data: null, error: new Error('ログインしてください') };
+    }
+
+    console.log(`📅 全タスクの開始日を ${startDate} に更新中...`);
+
+    // ユーザーが作成したプロジェクトを取得
+    const { data: projects, error: projectsError } = await supabase
+      .from('projects')
+      .select('id')
+      .eq('created_by', user.id);
+
+    if (projectsError) {
+      console.error('❌ プロジェクト取得エラー:', projectsError);
+      return { data: null, error: projectsError };
+    }
+
+    if (!projects || projects.length === 0) {
+      console.log('ℹ️ プロジェクトが見つかりません');
+      return { data: { updated: 0, total: 0 }, error: null };
+    }
+
+    const projectIds = projects.map(p => p.id);
+    console.log(`📊 ${projectIds.length}個のプロジェクトを確認`);
+
+    // 全タスクを取得
+    const { data: tasks, error: tasksError } = await supabase
+      .from('tasks')
+      .select('id, name, start_date')
+      .in('project_id', projectIds);
+
+    if (tasksError) {
+      console.error('❌ タスク取得エラー:', tasksError);
+      return { data: null, error: tasksError };
+    }
+
+    const totalTasks = tasks?.length || 0;
+    console.log(`📊 合計 ${totalTasks} 個のタスクが見つかりました`);
+
+    if (totalTasks === 0) {
+      console.log('ℹ️ 更新するタスクがありません');
+      return { data: { updated: 0, total: 0 }, error: null };
+    }
+
+    // start_dateが設定されていないタスクをフィルタリング
+    const tasksToUpdate = tasks.filter(task => !task.start_date);
+    console.log(`🔄 ${tasksToUpdate.length} 個のタスクを更新します`);
+
+    if (tasksToUpdate.length === 0) {
+      console.log('✅ 全てのタスクに開始日が設定されています');
+      return { data: { updated: 0, total: totalTasks }, error: null };
+    }
+
+    // 一括更新を実行
+    let updatedCount = 0;
+    const errors = [];
+
+    for (const task of tasksToUpdate) {
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update({ start_date: startDate })
+        .eq('id', task.id);
+
+      if (updateError) {
+        console.error(`❌ タスク "${task.name}" の更新に失敗:`, updateError);
+        errors.push({ task: task.name, error: updateError });
+      } else {
+        updatedCount++;
+        console.log(`✅ タスク "${task.name}" を更新しました`);
+      }
+    }
+
+    console.log(`\n📊 更新結果:`);
+    console.log(`  ✅ 成功: ${updatedCount} 個`);
+    console.log(`  ❌ 失敗: ${errors.length} 個`);
+    console.log(`  📝 合計: ${totalTasks} 個のタスク`);
+
+    if (errors.length > 0) {
+      return {
+        data: { updated: updatedCount, total: totalTasks, errors },
+        error: new Error(`${errors.length}個のタスクの更新に失敗しました`)
+      };
+    }
+
+    return { data: { updated: updatedCount, total: totalTasks }, error: null };
+  } catch (err) {
+    console.error('❌ 一括更新エラー:', err);
+    return { data: null, error: err };
+  }
+};

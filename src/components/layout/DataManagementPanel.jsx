@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, Upload, Database, CheckCircle, AlertCircle, X, Trash2 } from 'lucide-react';
+import { Download, Upload, Database, CheckCircle, AlertCircle, X, Trash2, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   exportAllData,
@@ -9,6 +9,7 @@ import {
   jsonToBackup,
   downloadFile
 } from '../../utils/dataBackupUtils';
+import { bulkUpdateTaskStartDates } from '../../utils/projectUtils';
 
 /**
  * データ管理パネルコンポーネント（Supabaseバックアップ対応）
@@ -171,6 +172,58 @@ export const DataManagementPanel = ({
     }
   };
 
+  // 全タスクの開始日を一括更新
+  const handleBulkUpdateStartDates = async () => {
+    if (!user) {
+      setImportStatus({ type: 'error', message: 'ログインしてください' });
+      return;
+    }
+
+    const confirmed = window.confirm(
+      '開始日が設定されていない全てのタスクの開始日を「2025-11-01」に設定します。\n\nよろしいですか？'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsProcessing(true);
+    setImportStatus({ type: 'info', message: 'タスクの開始日を更新中...' });
+
+    try {
+      const { data, error } = await bulkUpdateTaskStartDates('2025-11-01');
+
+      if (error) {
+        throw new Error(error.message || '更新に失敗しました');
+      }
+
+      if (data.updated === 0) {
+        setImportStatus({
+          type: 'success',
+          message: '全てのタスクに開始日が既に設定されています'
+        });
+      } else {
+        setImportStatus({
+          type: 'success',
+          message: `${data.updated}個のタスクの開始日を2025-11-01に設定しました（全${data.total}個中）`
+        });
+      }
+
+      // データを再読み込み
+      if (onDataRefresh) {
+        setTimeout(() => {
+          onDataRefresh();
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('一括更新エラー:', error);
+      setImportStatus({ type: 'error', message: `エラー: ${error.message}` });
+    } finally {
+      setIsProcessing(false);
+      setTimeout(() => setImportStatus(null), 5000);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* ステータスメッセージ */}
@@ -254,6 +307,29 @@ export const DataManagementPanel = ({
             </p>
           </div>
         </div>
+      </div>
+
+      {/* タスク一括更新セクション */}
+      <div className={`${cardBg} rounded-xl p-6 border`}>
+        <h3 className={`text-lg font-bold ${textColor} mb-4 flex items-center gap-2`}>
+          <Calendar size={20} />
+          タスク一括設定
+        </h3>
+        <p className={`text-sm ${textSecondary} mb-4`}>
+          開始日が未設定のタスクに一括で開始日を設定できます
+        </p>
+
+        <button
+          onClick={handleBulkUpdateStartDates}
+          disabled={isProcessing || !user}
+          className={`px-6 py-3 rounded-lg ${darkMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-500 hover:bg-purple-600'} text-white transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
+        >
+          <Calendar size={18} />
+          全タスクの開始日を2025-11-01に設定
+        </button>
+        <p className={`text-xs ${textSecondary} mt-2`}>
+          開始日が未設定のタスクに対してのみ、開始日を2025年11月1日に設定します（既に設定済みのタスクは変更されません）
+        </p>
       </div>
 
       {/* データ削除セクション */}
