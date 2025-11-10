@@ -293,7 +293,7 @@ export const LineNotifySettings = ({
           <div>
             <div className={`font-semibold ${textColor}`}>LINE通知を有効化</div>
             <div className={`text-sm ${textSecondary} mt-1`}>
-              毎日自動で日報を送信します（ブラウザが開いている必要があります）
+              毎日自動で日報を送信します（ブラウザでアプリを開いている必要があります。設定パネルは閉じてOK）
             </div>
           </div>
           <div className="relative">
