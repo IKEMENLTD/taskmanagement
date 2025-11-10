@@ -81,6 +81,7 @@ export const createProject = async (projectData) => {
         progress: projectData.progress || 0,
         timeline_start: projectData.timeline?.start || null,
         timeline_end: projectData.timeline?.end || null,
+        team: projectData.team || [],
         created_by: user?.id
       }])
       .select()
@@ -116,6 +117,11 @@ export const updateProject = async (projectId, updates) => {
       updateData.timeline_start = updates.timeline.start;
       updateData.timeline_end = updates.timeline.end;
       delete updateData.timeline;
+    }
+
+    // teamが配列でない場合は空配列に変換
+    if (updateData.team && !Array.isArray(updateData.team)) {
+      updateData.team = [];
     }
 
     const { data, error } = await supabase
