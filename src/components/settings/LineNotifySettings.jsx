@@ -304,7 +304,7 @@ export const LineNotifySettings = ({
               onClick={() => handleChange('enabled', !settings.enabled)}
             >
               <div
-                className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform ${
+                className={`w-6 h-6 rounded-full bg-white shadow-md transform transition-transform pointer-events-none ${
                   settings.enabled ? 'translate-x-7 translate-y-1' : 'translate-x-1 translate-y-1'
                 }`}
               />
