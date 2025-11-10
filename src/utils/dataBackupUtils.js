@@ -162,9 +162,6 @@ export const importAllData = async (userId, backupData, mode = 'replace') => {
           .insert([{
             name: member.name,
             role: member.role,
-            avatar: member.avatar,
-            skills: member.skills,
-            availability: member.availability,
             created_by: userId
           }]);
 
