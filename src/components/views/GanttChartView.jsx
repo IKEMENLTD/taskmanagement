@@ -299,7 +299,21 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                     >
                       <div className={`border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${textColor} flex items-center pl-6 pr-2`} style={{ height: '38px', minWidth: '256px', maxWidth: '256px', width: '256px' }}>
                         <div className="flex-1 overflow-hidden min-w-0">
-                          <div className="text-sm truncate leading-tight">{task.name}</div>
+                          <div className="flex items-center gap-1 mb-0.5">
+                            <div className="text-sm truncate leading-tight flex-shrink min-w-0">{task.name}</div>
+                            {task.priority && (
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+                                task.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                                task.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
+                                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                                'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                              }`}>
+                                {task.priority === 'urgent' ? '🔴' :
+                                 task.priority === 'high' ? '🟠' :
+                                 task.priority === 'medium' ? '🟡' : '🟢'}
+                              </span>
+                            )}
+                          </div>
                           <div className={`text-xs ${textSecondary} truncate leading-tight`}>
                             {task.assignee}
                           </div>
