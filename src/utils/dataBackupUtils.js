@@ -232,8 +232,16 @@ export const importAllData = async (userId, backupData, mode = 'replace') => {
  * @returns {Promise<{data: any, error: any}>}
  */
 export const deleteAllUserData = async (userId) => {
+  const results = {
+    tasks: { success: false, count: 0, error: null },
+    projects: { success: false, count: 0, error: null },
+    teamMembers: { success: false, count: 0, error: null },
+    routineTasks: { success: false, count: 0, error: null },
+    routineCompletions: { success: false, count: 0, error: null }
+  };
+
   try {
-    // プロジェクトに紐づくタスクを削除（CASCADE設定されている場合は自動削除）
+    // プロジェクトに紐づくタスクを削除
     const { data: projects } = await supabase
       .from('projects')
       .select('id')
@@ -241,42 +249,110 @@ export const deleteAllUserData = async (userId) => {
 
     if (projects && projects.length > 0) {
       const projectIds = projects.map(p => p.id);
+      console.log(`🗑️ ${projectIds.length}個のプロジェクトに紐づくタスクを削除中...`);
 
-      // タスクを削除
-      await supabase
+      const { error: tasksError, count: tasksCount } = await supabase
         .from('tasks')
         .delete()
         .in('project_id', projectIds);
+
+      if (tasksError) {
+        console.error('❌ タスク削除エラー:', tasksError);
+        results.tasks.error = tasksError;
+      } else {
+        results.tasks.success = true;
+        results.tasks.count = projectIds.length;
+        console.log(`✅ タスクを削除しました`);
+      }
+    } else {
+      results.tasks.success = true;
+      console.log('ℹ️ 削除するタスクがありません');
     }
 
     // プロジェクトを削除
-    await supabase
+    console.log('🗑️ プロジェクトを削除中...');
+    const { error: projectsError } = await supabase
       .from('projects')
       .delete()
       .eq('created_by', userId);
 
+    if (projectsError) {
+      console.error('❌ プロジェクト削除エラー:', projectsError);
+      results.projects.error = projectsError;
+    } else {
+      results.projects.success = true;
+      results.projects.count = projects?.length || 0;
+      console.log(`✅ ${results.projects.count}個のプロジェクトを削除しました`);
+    }
+
     // チームメンバーを削除
-    await supabase
+    console.log('🗑️ チームメンバーを削除中...');
+    const { error: membersError, count: membersCount } = await supabase
       .from('team_members')
       .delete()
-      .eq('created_by', userId);
+      .eq('created_by', userId)
+      .select();
+
+    if (membersError) {
+      console.error('❌ チームメンバー削除エラー:', membersError);
+      results.teamMembers.error = membersError;
+    } else {
+      results.teamMembers.success = true;
+      results.teamMembers.count = membersCount || 0;
+      console.log(`✅ ${results.teamMembers.count}人のチームメンバーを削除しました`);
+    }
 
     // ルーティンタスクを削除
-    await supabase
+    console.log('🗑️ ルーティンタスクを削除中...');
+    const { error: routineError, count: routineCount } = await supabase
       .from('routine_tasks')
       .delete()
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .select();
+
+    if (routineError) {
+      console.error('❌ ルーティンタスク削除エラー:', routineError);
+      results.routineTasks.error = routineError;
+    } else {
+      results.routineTasks.success = true;
+      results.routineTasks.count = routineCount || 0;
+      console.log(`✅ ${results.routineTasks.count}個のルーティンタスクを削除しました`);
+    }
 
     // ルーティン達成記録を削除
-    await supabase
+    console.log('🗑️ ルーティン達成記録を削除中...');
+    const { error: completionsError, count: completionsCount } = await supabase
       .from('routine_completions')
       .delete()
-      .eq('user_id', userId);
+      .eq('user_id', userId)
+      .select();
 
-    console.log('✅ 全データを削除しました');
-    return { data: { success: true }, error: null };
+    if (completionsError) {
+      console.error('❌ ルーティン達成記録削除エラー:', completionsError);
+      results.routineCompletions.error = completionsError;
+    } else {
+      results.routineCompletions.success = true;
+      results.routineCompletions.count = completionsCount || 0;
+      console.log(`✅ ${results.routineCompletions.count}件のルーティン達成記録を削除しました`);
+    }
+
+    // 結果サマリー
+    const allSuccess = Object.values(results).every(r => r.success);
+    const totalDeleted = Object.values(results).reduce((sum, r) => sum + r.count, 0);
+
+    if (allSuccess) {
+      console.log(`✅ 全データ削除完了: 合計${totalDeleted}件`);
+      return { data: { success: true, results }, error: null };
+    } else {
+      const errors = Object.entries(results)
+        .filter(([_, r]) => r.error)
+        .map(([key, r]) => `${key}: ${r.error.message}`)
+        .join(', ');
+      console.warn(`⚠️ 一部削除に失敗: ${errors}`);
+      return { data: { success: false, results }, error: errors };
+    }
   } catch (err) {
-    console.error('データ削除エラー:', err);
+    console.error('❌ データ削除エラー:', err);
     return { data: null, error: err };
   }
 };
