@@ -109,7 +109,8 @@ export const formatDateForGantt = (date, viewMode) => {
   } else if (viewMode === 'quarter') {
     return `${d.getMonth() + 1}/${d.getDate()}`;
   } else if (viewMode === 'year') {
-    return `${d.getFullYear()}/${d.getMonth() + 1}`;
+    const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    return monthNames[d.getMonth()];
   }
 
   return date;
@@ -240,4 +241,12 @@ export const isToday = (date) => {
   return today.getFullYear() === checkDate.getFullYear() &&
          today.getMonth() === checkDate.getMonth() &&
          today.getDate() === checkDate.getDate();
+};
+
+/**
+ * 四半期を取得（0-3）
+ */
+export const getQuarter = (date) => {
+  const month = new Date(date).getMonth();
+  return Math.floor(month / 3);
 };

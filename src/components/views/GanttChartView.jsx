@@ -9,7 +9,8 @@ import {
   isTaskDelayed,
   getProjectDateRange,
   isWeekend,
-  isToday
+  isToday,
+  getQuarter
 } from '../../utils/ganttUtils';
 import { getAllTasksFromProjects } from '../../utils/dependencyUtils';
 
@@ -153,6 +154,12 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
             >
               <ChevronLeft size={20} />
             </button>
+            <div className={`px-4 py-2 ${textColor} text-sm font-semibold min-w-[120px] text-center`}>
+              {viewMode === 'year' && `${baseDate.getFullYear()}年`}
+              {viewMode === 'quarter' && `${baseDate.getFullYear()}年 Q${Math.floor(baseDate.getMonth() / 3) + 1}`}
+              {viewMode === 'month' && `${baseDate.getFullYear()}年${baseDate.getMonth() + 1}月`}
+              {viewMode === 'week' && `${baseDate.getFullYear()}/${baseDate.getMonth() + 1}/${baseDate.getDate()}`}
+            </div>
             <button
               onClick={goToToday}
               className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white text-sm transition-all`}
@@ -220,17 +227,36 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
 
                 {/* 日付列 */}
                 <div className="flex-1 flex">
-                  {dateRange.map((date, index) => (
-                    <div
-                      key={index}
-                      className={`flex-1 py-2 px-1 text-center text-xs border-r flex items-center justify-center ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${
-                        isToday(date) ? 'bg-blue-100 dark:bg-blue-900/30' : ''
-                      } ${isWeekend(date) ? (darkMode ? 'bg-gray-700' : 'bg-gray-50') : ''} ${textSecondary}`}
-                      style={{ minWidth: '40px', height: '36px' }}
-                    >
-                      {formatDateForGantt(date, viewMode)}
-                    </div>
-                  ))}
+                  {dateRange.map((date, index) => {
+                    // 年表示の場合は四半期ごとに色分け
+                    let quarterBg = '';
+                    if (viewMode === 'year') {
+                      const quarter = getQuarter(date);
+                      if (quarter === 0) {
+                        quarterBg = darkMode ? 'bg-blue-900/20' : 'bg-blue-50';
+                      } else if (quarter === 1) {
+                        quarterBg = darkMode ? 'bg-green-900/20' : 'bg-green-50';
+                      } else if (quarter === 2) {
+                        quarterBg = darkMode ? 'bg-yellow-900/20' : 'bg-yellow-50';
+                      } else {
+                        quarterBg = darkMode ? 'bg-purple-900/20' : 'bg-purple-50';
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={index}
+                        className={`flex-1 py-2 px-1 text-center border-r flex items-center justify-center ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${
+                          isToday(date) ? 'bg-blue-100 dark:bg-blue-900/30' :
+                          viewMode === 'year' ? quarterBg :
+                          isWeekend(date) ? (darkMode ? 'bg-gray-700' : 'bg-gray-50') : ''
+                        } ${textSecondary} ${viewMode === 'year' ? 'text-sm font-medium' : 'text-xs'}`}
+                        style={{ minWidth: viewMode === 'year' ? '70px' : '40px', height: '36px' }}
+                      >
+                        {formatDateForGantt(date, viewMode)}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
