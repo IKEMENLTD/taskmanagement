@@ -295,8 +295,8 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                         let projectStart = project.timeline?.start;
                         let projectEnd = project.timeline?.end;
 
-                        // タイムラインが設定されていない、またはタスクがある場合はタスクの範囲を使用
-                        if ((!projectStart || !projectEnd) && project.tasks && project.tasks.length > 0) {
+                        // タイムラインが設定されていない、またはnull/undefinedの場合はタスクの範囲を使用
+                        if ((!projectStart || !projectEnd || projectStart === 'null' || projectEnd === 'null') && project.tasks && project.tasks.length > 0) {
                           const taskDates = project.tasks
                             .filter(t => t.startDate && t.dueDate)
                             .map(t => ({
@@ -318,11 +318,19 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
 
                             projectStart = formatDate(minStart);
                             projectEnd = formatDate(maxEnd);
+
+                            console.log(`📊 プロジェクト「${project.name}」の期間を計算:`);
+                            console.log(`  タスク数: ${project.tasks.length}, 有効なタスク: ${taskDates.length}`);
+                            console.log(`  計算された期間: ${projectStart} 〜 ${projectEnd}`);
                           }
+                        } else {
+                          console.log(`📊 プロジェクト「${project.name}」:`);
+                          console.log(`  timeline設定: ${projectStart} 〜 ${projectEnd}`);
                         }
 
                         // それでも日付がない場合は表示しない
-                        if (!projectStart || !projectEnd) {
+                        if (!projectStart || !projectEnd || projectStart === 'null' || projectEnd === 'null') {
+                          console.log(`⚠️ プロジェクト「${project.name}」: 日付データがないため非表示`);
                           return null;
                         }
 
@@ -332,6 +340,8 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                           endDate,
                           CHART_WIDTH
                         );
+
+                        console.log(`  表示位置: left=${position.left}%, width=${position.width}%`);
 
                         return (
                           <div
