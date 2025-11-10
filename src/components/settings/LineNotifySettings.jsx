@@ -81,26 +81,30 @@ export const LineNotifySettings = ({
       return;
     }
 
+    // メンバー未選択の場合は警告を出すが保存は許可
+    let warningMessage = '';
     if (settings.enabled && settings.selectedMembers.length === 0) {
-      setMessage({ type: 'error', text: '送信対象のメンバーを選択してください' });
-      setIsSaving(false);
-      return;
+      warningMessage = '⚠️ 送信対象メンバーが未選択です。自動送信は実行されません。';
     }
 
     const success = saveLineSettings(settings);
 
     if (success) {
-      setMessage({ type: 'success', text: '設定を保存しました' });
+      if (warningMessage) {
+        setMessage({ type: 'success', text: `設定を保存しました。${warningMessage}` });
+      } else {
+        setMessage({ type: 'success', text: '設定を保存しました' });
+      }
     } else {
       setMessage({ type: 'error', text: '設定の保存に失敗しました' });
     }
 
     setIsSaving(false);
 
-    // 3秒後にメッセージを消す
+    // 5秒後にメッセージを消す
     setTimeout(() => {
       setMessage({ type: '', text: '' });
-    }, 3000);
+    }, 5000);
   };
 
   // テスト送信
