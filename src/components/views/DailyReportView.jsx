@@ -135,7 +135,7 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
     return report;
   };
 
-  // メンバー別のレポートセクションを生成
+  // メンバー別のレポートセクションを生成（プロジェクトごとにグループ化）
   const generateMemberReportSection = (member) => {
     const memberCompletedTasks = reportData.completedTasks.filter(t => t.assignee === member);
     const memberActiveTasks = reportData.updatedTasks.filter(t => t.assignee === member);
@@ -150,52 +150,82 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
 
     let section = `\n【${member}さん】\n`;
 
-    // 完了したタスク
-    if (memberCompletedTasks.length > 0) {
-      section += `✅ 本日完了 (${memberCompletedTasks.length}件)\n`;
-      memberCompletedTasks.forEach((task, index) => {
-        section += `${index + 1}. ${task.name}\n`;
-        section += `  ${task.projectName}\n`;
-      });
-    }
+    // メンバーの全タスク（完了+進行中+ブロック中）
+    const allMemberTasks = [...memberCompletedTasks, ...memberActiveTasks];
 
-    // 進行中のタスク
-    const activeNonBlocked = memberActiveTasks.filter(t => t.status !== 'blocked');
-    if (activeNonBlocked.length > 0) {
-      section += `\n🔄 進行中 (${activeNonBlocked.length}件)\n`;
-      activeNonBlocked.slice(0, 3).forEach((task, index) => {
-        const priority = task.priority === 'urgent' ? '🔴' :
-                         task.priority === 'high' ? '🟠' :
-                         task.priority === 'medium' ? '🟡' : '🟢';
-        section += `${index + 1}. ${priority} ${task.name}\n`;
-        section += `  ${task.projectName} (${task.progress}%)`;
-        if (task.dueDate) {
-          section += ` 期限:${task.dueDate}`;
-        }
-        section += `\n`;
-      });
-      if (activeNonBlocked.length > 3) {
-        section += `  ...他${activeNonBlocked.length - 3}件\n`;
+    // プロジェクトごとにタスクをグループ化
+    const tasksByProject = {};
+    allMemberTasks.forEach(task => {
+      if (!tasksByProject[task.projectName]) {
+        tasksByProject[task.projectName] = {
+          name: task.projectName,
+          color: task.projectColor,
+          progress: 0,
+          tasks: []
+        };
       }
-    }
+      tasksByProject[task.projectName].tasks.push(task);
+    });
 
-    // ブロック中のタスク
-    if (memberBlockedTasks.length > 0) {
-      section += `\n⚠️ ブロック中 (${memberBlockedTasks.length}件)\n`;
-      memberBlockedTasks.forEach((task, index) => {
-        section += `${index + 1}. ${task.name}\n`;
-        section += `  ${task.projectName}\n`;
+    // プロジェクト進捗を計算
+    Object.keys(tasksByProject).forEach(projectName => {
+      const project = reportData.projectProgress.find(p => p.name === projectName);
+      if (project) {
+        tasksByProject[projectName].progress = project.progress;
+      }
+    });
+
+    // プロジェクトごとに表示
+    if (Object.keys(tasksByProject).length > 0) {
+      Object.values(tasksByProject).forEach(project => {
+        section += `\n📁 ${project.name} (進捗 ${project.progress}%)\n`;
+
+        // 完了したタスク
+        const completedInProject = project.tasks.filter(t => memberCompletedTasks.includes(t));
+        if (completedInProject.length > 0) {
+          section += `  ✅ 本日完了:\n`;
+          completedInProject.forEach(task => {
+            const priority = task.priority === 'urgent' ? '🔴' :
+                           task.priority === 'high' ? '🟠' :
+                           task.priority === 'medium' ? '🟡' : '🟢';
+            section += `    ${priority} ${task.name}\n`;
+          });
+        }
+
+        // 進行中のタスク
+        const activeInProject = project.tasks.filter(t => memberActiveTasks.includes(t) && t.status !== 'blocked');
+        if (activeInProject.length > 0) {
+          section += `  🔄 進行中:\n`;
+          activeInProject.forEach(task => {
+            const priority = task.priority === 'urgent' ? '🔴' :
+                           task.priority === 'high' ? '🟠' :
+                           task.priority === 'medium' ? '🟡' : '🟢';
+            section += `    ${priority} ${task.name} (${task.progress}%)`;
+            if (task.dueDate) {
+              section += ` 期限:${task.dueDate}`;
+            }
+            section += `\n`;
+          });
+        }
+
+        // ブロック中のタスク
+        const blockedInProject = project.tasks.filter(t => memberBlockedTasks.includes(t));
+        if (blockedInProject.length > 0) {
+          section += `  ⚠️ ブロック中:\n`;
+          blockedInProject.forEach(task => {
+            section += `    ${task.name}\n`;
+          });
+        }
       });
     }
 
     // ルーティン達成率
-    if (memberRoutineTotal > 0) {
-      const emoji = memberRoutineRate >= 80 ? '🎉' : memberRoutineRate >= 50 ? '👍' : '💪';
-      section += `\n${emoji} ルーティン達成率: ${memberRoutineRate}%`;
-      section += ` (${memberCompletedRoutines.length}/${memberRoutineTotal}件)\n`;
-    }
+    const emoji = memberRoutineRate >= 80 ? '🎉' : memberRoutineRate >= 50 ? '👍' : '💪';
+    section += `\n${emoji} ルーティン達成率: ${memberRoutineRate}%`;
+    section += ` (${memberCompletedRoutines.length}/${memberRoutineTotal}件)\n`;
 
     // サマリー
+    const activeNonBlocked = memberActiveTasks.filter(t => t.status !== 'blocked');
     const totalTasks = memberCompletedTasks.length + memberActiveTasks.length;
     section += `\n📈 サマリー\n`;
     section += `タスク総数: ${totalTasks}件\n`;
