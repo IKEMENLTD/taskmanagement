@@ -47,6 +47,7 @@ export const getAllProjects = async () => {
         return {
           ...project,
           tasks: convertedTasks,
+          team: project.team || [],
           timeline: {
             start: project.timeline_start,
             end: project.timeline_end
@@ -90,7 +91,7 @@ export const createProject = async (projectData) => {
       return { data: null, error };
     }
 
-    return { data: { ...data, tasks: [] }, error: null };
+    return { data: { ...data, tasks: [], team: [] }, error: null };
   } catch (err) {
     console.error('プロジェクト作成エラー:', err);
     return { data: null, error: err };

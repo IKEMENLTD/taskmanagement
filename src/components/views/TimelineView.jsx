@@ -222,7 +222,7 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
       name: project.name,
       status: project.status,
       timeline: { ...project.timeline },
-      team: [...project.team],
+      team: project.team ? [...project.team] : [],
       color: project.color || '#3b82f6', // 既存の色またはデフォルト
       progress: project.progress
     });
