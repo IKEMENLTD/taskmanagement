@@ -131,7 +131,16 @@ export const getViewRange = (viewMode, baseDate = new Date()) => {
   } else if (viewMode === 'month') {
     // 今月の1日から末日
     startDate = new Date(today.getFullYear(), today.getMonth(), 1);
-    endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    // 翌月の1日の前日を取得（月末）
+    endDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    endDate.setDate(endDate.getDate() - 1);
+
+    console.log('🗓️ Month View Range Debug:');
+    console.log('  baseDate:', today.toISOString());
+    console.log('  year:', today.getFullYear());
+    console.log('  month (0-indexed):', today.getMonth());
+    console.log('  startDate:', startDate.toISOString());
+    console.log('  endDate:', endDate.toISOString());
   } else if (viewMode === 'quarter') {
     // 今四半期
     const quarter = Math.floor(today.getMonth() / 3);
@@ -143,10 +152,14 @@ export const getViewRange = (viewMode, baseDate = new Date()) => {
     endDate = new Date(today.getFullYear(), 11, 31);
   }
 
-  return {
+  const result = {
     startDate: startDate.toISOString().split('T')[0],
     endDate: endDate.toISOString().split('T')[0]
   };
+
+  console.log('📅 Final Range:', result);
+
+  return result;
 };
 
 /**
