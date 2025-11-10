@@ -13,12 +13,6 @@ import {
   bulkMoveTasksToProject
 } from '../../utils/bulkOperationsUtils';
 import { useAuth } from '../../contexts/AuthContext';
-import {
-  canCreateProject,
-  canCreateTask,
-  canEditTask,
-  canDeleteTask
-} from '../../utils/permissionUtils';
 import { createProject, updateProject, deleteProject, createTask, updateTask, deleteTask } from '../../utils/projectUtils';
 
 /**
@@ -31,7 +25,7 @@ import { createProject, updateProject, deleteProject, createTask, updateTask, de
  */
 export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers = [], darkMode = false }) => {
   // 認証情報
-  const { user, role } = useAuth();
+  const { user } = useAuth();
 
   const cardBg = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
   const textColor = darkMode ? 'text-gray-100' : 'text-gray-900';
@@ -531,15 +525,13 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
           <h2 className={`text-2xl font-bold ${textColor}`}>プロジェクト一覧</h2>
           <p className={`${textSecondary} mt-1`}>すべてのプロジェクトと進捗を確認できます</p>
         </div>
-        {canCreateProject(role) && (
-          <button
-            onClick={openAddModal}
-            className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
-          >
-            <Plus size={18} />
-            プロジェクト追加
-          </button>
-        )}
+        <button
+          onClick={openAddModal}
+          className={`px-4 py-2 rounded-lg font-medium transition-all text-sm flex items-center gap-2 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+        >
+          <Plus size={18} />
+          プロジェクト追加
+        </button>
       </div>
 
       {/* フィルター */}
@@ -641,14 +633,12 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <h3 className={`font-bold ${textColor}`}>{project.name}</h3>
-                {canCreateProject(role) && (
-                  <button
-                    onClick={() => openDetailModal(project)}
-                    className={`${textSecondary} hover:${textColor} transition-colors p-1`}
-                  >
-                    <Edit size={14} />
-                  </button>
-                )}
+                <button
+                  onClick={() => openDetailModal(project)}
+                  className={`${textSecondary} hover:${textColor} transition-colors p-1`}
+                >
+                  <Edit size={14} />
+                </button>
               </div>
               <div className={`text-xs ${textSecondary} mt-1 flex items-center gap-3`}>
                 {project.team && project.team.length > 0 && (
@@ -687,17 +677,15 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
           </div>
 
           {/* タスク追加ボタン */}
-          {canCreateTask(role) && (
-            <div className="mt-3 flex justify-end">
-              <button
-                onClick={() => openAddTaskModal(project.id)}
-                className={`px-3 py-1.5 rounded-lg font-medium transition-all text-xs flex items-center gap-1 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
-              >
-                <Plus size={14} />
-                タスク追加
-              </button>
-            </div>
-          )}
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={() => openAddTaskModal(project.id)}
+              className={`px-3 py-1.5 rounded-lg font-medium transition-all text-xs flex items-center gap-1 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white`}
+            >
+              <Plus size={14} />
+              タスク追加
+            </button>
+          </div>
 
           {/* タスク一覧 */}
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -751,30 +739,26 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                   <div className="flex items-center gap-1">
                     {task.status === 'completed' && <CheckCircle size={14} className="text-green-500" />}
                     {task.status === 'blocked' && <AlertCircle size={14} className="text-red-500 animate-pulse" />}
-                    {canEditTask(role, task.assignee, user?.id) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditTaskModal(task, project.id);
-                        }}
-                        className={`${textSecondary} hover:text-blue-500 transition-colors p-1`}
-                        title="編集"
-                      >
-                        <Edit size={12} />
-                      </button>
-                    )}
-                    {canDeleteTask(role) && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteTask(task.id, project.id);
-                        }}
-                        className={`${textSecondary} hover:text-red-500 transition-colors p-1`}
-                        title="削除"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditTaskModal(task, project.id);
+                      }}
+                      className={`${textSecondary} hover:text-blue-500 transition-colors p-1`}
+                      title="編集"
+                    >
+                      <Edit size={12} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteTask(task.id, project.id);
+                      }}
+                      className={`${textSecondary} hover:text-red-500 transition-colors p-1`}
+                      title="削除"
+                    >
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 </div>
                 <div className={`text-xs ${textSecondary} mb-1`}>{task.assignee}</div>
