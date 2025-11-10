@@ -271,10 +271,12 @@ export const shouldRoutineRunOnDate = (routine, date) => {
     return dayOfWeek === 0 || dayOfWeek === 6;
   }
 
-  if (routine.repeat === 'custom' && routine.selectedDays && routine.selectedDays.length > 0) {
+  // カスタム繰り返し: selected_days（スネークケース）も確認
+  const selectedDays = routine.selectedDays || routine.selected_days;
+  if (routine.repeat === 'custom' && selectedDays && selectedDays.length > 0) {
     // カスタム（選択された曜日）
     // 文字列と数値の両方に対応
-    return routine.selectedDays.some(day => {
+    return selectedDays.some(day => {
       const numDay = typeof day === 'string' ? parseInt(day, 10) : day;
       return numDay === dayOfWeek;
     });
