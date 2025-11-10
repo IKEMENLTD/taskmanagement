@@ -6,6 +6,15 @@ import { getCategoryColor, getCategoryText } from '../../utils/colorUtils';
  * 繰り返しテキストを取得
  */
 const getRepeatText = (routine) => {
+  // デバッグログ
+  console.log('🔍 getRepeatText:', {
+    name: routine.name,
+    repeat: routine.repeat,
+    selectedDays: routine.selectedDays,
+    selectedDaysType: typeof routine.selectedDays,
+    selectedDaysLength: routine.selectedDays?.length
+  });
+
   if (routine.repeat === 'daily') return '毎日';
   if (routine.repeat === 'weekday') return '平日';
   if (routine.repeat === 'weekend') return '週末';
