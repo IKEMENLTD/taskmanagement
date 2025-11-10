@@ -265,8 +265,43 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
 
                       {/* プロジェクトバー */}
                       {(() => {
+                        // プロジェクトのタイムラインを取得、なければタスクから計算
+                        let projectStart = project.timeline?.start;
+                        let projectEnd = project.timeline?.end;
+
+                        // タイムラインが設定されていない、またはタスクがある場合はタスクの範囲を使用
+                        if ((!projectStart || !projectEnd) && project.tasks && project.tasks.length > 0) {
+                          const taskDates = project.tasks
+                            .filter(t => t.startDate && t.dueDate)
+                            .map(t => ({
+                              start: new Date(t.startDate),
+                              end: new Date(t.dueDate)
+                            }));
+
+                          if (taskDates.length > 0) {
+                            const minStart = new Date(Math.min(...taskDates.map(d => d.start.getTime())));
+                            const maxEnd = new Date(Math.max(...taskDates.map(d => d.end.getTime())));
+
+                            // ローカル時間で日付文字列を生成
+                            const formatDate = (date) => {
+                              const year = date.getFullYear();
+                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                              const day = String(date.getDate()).padStart(2, '0');
+                              return `${year}-${month}-${day}`;
+                            };
+
+                            projectStart = formatDate(minStart);
+                            projectEnd = formatDate(maxEnd);
+                          }
+                        }
+
+                        // それでも日付がない場合は表示しない
+                        if (!projectStart || !projectEnd) {
+                          return null;
+                        }
+
                         const position = calculateTaskPosition(
-                          { startDate: project.timeline.start, dueDate: project.timeline.end },
+                          { startDate: projectStart, dueDate: projectEnd },
                           startDate,
                           endDate,
                           CHART_WIDTH
