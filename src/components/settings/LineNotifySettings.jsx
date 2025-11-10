@@ -319,89 +319,6 @@ export const LineNotifySettings = ({
         </label>
       </div>
 
-      {/* 認証情報セクション */}
-      <div className={`${cardBg} rounded-lg border-2 ${isEditingCredentials ? 'border-yellow-500' : 'border-gray-300 dark:border-gray-600'} p-4`}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Lock size={20} className={isEditingCredentials ? 'text-yellow-500' : 'text-gray-400'} />
-            <h4 className={`font-bold ${textColor}`}>認証情報</h4>
-            {!isEditingCredentials && settings.channelAccessToken && (
-              <span className="text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-                設定済み
-              </span>
-            )}
-          </div>
-          {!isEditingCredentials ? (
-            <button
-              onClick={handleStartEditCredentials}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${textColor} transition-colors`}
-            >
-              <Edit2 size={16} />
-              編集
-            </button>
-          ) : (
-            <button
-              onClick={handleCancelEditCredentials}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-500 hover:bg-gray-600 text-white transition-colors`}
-            >
-              <X size={16} />
-              キャンセル
-            </button>
-          )}
-        </div>
-
-        {isEditingCredentials && (
-          <div className="mb-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700">
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              ⚠️ 認証情報を変更する場合は、保存時に確認ダイアログが表示されます
-            </p>
-          </div>
-        )}
-
-        {/* Channel Access Token */}
-        <div className="mb-4">
-          <label className={`block font-semibold ${textColor} mb-2`}>
-            Channel Access Token <span className="text-red-500">*</span>
-          </label>
-          {!isEditingCredentials && settings.channelAccessToken ? (
-            <div className={`w-full px-4 py-3 rounded-lg border ${inputBg} ${textSecondary} font-mono text-sm flex items-center justify-between`}>
-              <span>{maskToken(settings.channelAccessToken)}</span>
-              <Lock size={16} className="text-gray-400" />
-            </div>
-          ) : (
-            <input
-              type="text"
-              value={settings.channelAccessToken}
-              onChange={(e) => handleChange('channelAccessToken', e.target.value)}
-              placeholder="LINE Developersで発行した長期トークンを入力"
-              className={`w-full px-4 py-3 rounded-lg border ${inputBg} ${textColor} focus:ring-2 focus:ring-green-500 focus:border-transparent`}
-              disabled={!isEditingCredentials}
-            />
-          )}
-          <p className={`text-xs ${textSecondary} mt-2`}>
-            トークンは暗号化されて保存されます。外部に公開しないでください。
-          </p>
-        </div>
-
-        {/* Group ID */}
-        <div>
-          <label className={`block font-semibold ${textColor} mb-2`}>
-            Group ID <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="text"
-            value={settings.groupId}
-            onChange={(e) => handleChange('groupId', e.target.value)}
-            placeholder="C1234567890abcdef1234567890abcdef (Cから始まる)"
-            className={`w-full px-4 py-3 rounded-lg border ${inputBg} ${textColor} focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed`}
-            disabled={!isEditingCredentials}
-          />
-          <p className={`text-xs ${textSecondary} mt-2`}>
-            送信先のLINEグループのID。「C」から始まる英数字の文字列です。
-          </p>
-        </div>
-      </div>
-
       {/* 送信時刻 */}
       <div className={`${cardBg} rounded-lg border p-4`}>
         <label className={`block font-semibold ${textColor} mb-2 flex items-center gap-2`}>
@@ -522,6 +439,89 @@ export const LineNotifySettings = ({
           最終送信: {settings.lastSentDateTime || settings.lastSentDate}
         </div>
       )}
+
+      {/* 認証情報セクション */}
+      <div className={`${cardBg} rounded-lg border-2 ${isEditingCredentials ? 'border-yellow-500' : 'border-gray-300 dark:border-gray-600'} p-4`}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Lock size={20} className={isEditingCredentials ? 'text-yellow-500' : 'text-gray-400'} />
+            <h4 className={`font-bold ${textColor}`}>認証情報</h4>
+            {!isEditingCredentials && settings.channelAccessToken && (
+              <span className="text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+                設定済み
+              </span>
+            )}
+          </div>
+          {!isEditingCredentials ? (
+            <button
+              onClick={handleStartEditCredentials}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${textColor} transition-colors`}
+            >
+              <Edit2 size={16} />
+              編集
+            </button>
+          ) : (
+            <button
+              onClick={handleCancelEditCredentials}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-gray-500 hover:bg-gray-600 text-white transition-colors`}
+            >
+              <X size={16} />
+              キャンセル
+            </button>
+          )}
+        </div>
+
+        {isEditingCredentials && (
+          <div className="mb-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700">
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">
+              ⚠️ 認証情報を変更する場合は、保存時に確認ダイアログが表示されます
+            </p>
+          </div>
+        )}
+
+        {/* Channel Access Token */}
+        <div className="mb-4">
+          <label className={`block font-semibold ${textColor} mb-2`}>
+            Channel Access Token <span className="text-red-500">*</span>
+          </label>
+          {!isEditingCredentials && settings.channelAccessToken ? (
+            <div className={`w-full px-4 py-3 rounded-lg border ${inputBg} ${textSecondary} font-mono text-sm flex items-center justify-between`}>
+              <span>{maskToken(settings.channelAccessToken)}</span>
+              <Lock size={16} className="text-gray-400" />
+            </div>
+          ) : (
+            <input
+              type="text"
+              value={settings.channelAccessToken}
+              onChange={(e) => handleChange('channelAccessToken', e.target.value)}
+              placeholder="LINE Developersで発行した長期トークンを入力"
+              className={`w-full px-4 py-3 rounded-lg border ${inputBg} ${textColor} focus:ring-2 focus:ring-green-500 focus:border-transparent`}
+              disabled={!isEditingCredentials}
+            />
+          )}
+          <p className={`text-xs ${textSecondary} mt-2`}>
+            トークンは暗号化されて保存されます。外部に公開しないでください。
+          </p>
+        </div>
+
+        {/* Group ID */}
+        <div>
+          <label className={`block font-semibold ${textColor} mb-2`}>
+            Group ID <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={settings.groupId}
+            onChange={(e) => handleChange('groupId', e.target.value)}
+            placeholder="C1234567890abcdef1234567890abcdef (Cから始まる)"
+            className={`w-full px-4 py-3 rounded-lg border ${inputBg} ${textColor} focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed`}
+            disabled={!isEditingCredentials}
+          />
+          <p className={`text-xs ${textSecondary} mt-2`}>
+            送信先のLINEグループのID。「C」から始まる英数字の文字列です。
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
