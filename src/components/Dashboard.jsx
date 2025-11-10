@@ -101,44 +101,64 @@ const Dashboard = () => {
   }, []);
 
   // Supabaseからプロジェクト、チームメンバー、ルーティンカテゴリーを読み込む
-  useEffect(() => {
-    const loadData = async () => {
-      if (!user) {
-        setIsLoadingData(false);
-        return;
-      }
-
-      setIsLoadingData(true);
-
-      // プロジェクトを取得
-      const { data: projectsData, error: projectsError } = await getAllProjects();
-      if (!projectsError && projectsData) {
-        setProjects(projectsData);
-      } else if (projectsError) {
-        console.error('プロジェクト取得エラー:', projectsError);
-      }
-
-      // チームメンバーを取得
-      const { data: membersData, error: membersError } = await getAllTeamMembers();
-      if (!membersError && membersData) {
-        setTeamMembers(membersData);
-      } else if (membersError) {
-        console.error('チームメンバー取得エラー:', membersError);
-      }
-
-      // ルーティンカテゴリーを取得
-      const { data: categoriesData, error: categoriesError } = await getAllRoutineCategories();
-      if (!categoriesError && categoriesData) {
-        setRoutineCategories(categoriesData);
-      } else if (categoriesError) {
-        console.error('ルーティンカテゴリー取得エラー:', categoriesError);
-      }
-
+  const loadData = useCallback(async () => {
+    if (!user) {
       setIsLoadingData(false);
-    };
+      return;
+    }
 
-    loadData();
+    setIsLoadingData(true);
+
+    // プロジェクトを取得
+    const { data: projectsData, error: projectsError } = await getAllProjects();
+    if (!projectsError && projectsData) {
+      setProjects(projectsData);
+    } else if (projectsError) {
+      console.error('プロジェクト取得エラー:', projectsError);
+    }
+
+    // チームメンバーを取得
+    const { data: membersData, error: membersError } = await getAllTeamMembers();
+    if (!membersError && membersData) {
+      setTeamMembers(membersData);
+    } else if (membersError) {
+      console.error('チームメンバー取得エラー:', membersError);
+    }
+
+    // ルーティンカテゴリーを取得
+    const { data: categoriesData, error: categoriesError } = await getAllRoutineCategories();
+    if (!categoriesError && categoriesData) {
+      setRoutineCategories(categoriesData);
+    } else if (categoriesError) {
+      console.error('ルーティンカテゴリー取得エラー:', categoriesError);
+    }
+
+    // ルーティンタスクを取得
+    const today = new Date().toISOString().split('T')[0];
+    const { data: routinesData, error: routinesError } = await getRoutineTasks(user.id, today);
+    if (!routinesError && routinesData) {
+      const mappedData = routinesData.map(task => ({
+        id: task.id,
+        name: task.name,
+        description: task.description || '',
+        time: task.time,
+        category: task.category,
+        assignee: task.assignee,
+        repeat: task.repeat,
+        selectedDays: task.selectedDays || task.selected_days || [],
+        completed: task.completed || false,
+        skipped: task.skipped || false,
+        date: task.date || today
+      }));
+      setRoutineTasks({ [today]: mappedData });
+    }
+
+    setIsLoadingData(false);
   }, [user]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // リアルタイム同期の設定
   useEffect(() => {
@@ -979,17 +999,7 @@ const Dashboard = () => {
         <SettingsPanel
           onClose={() => setShowSettings(false)}
           darkMode={darkMode}
-          projects={projects}
-          setProjects={setProjects}
-          teamMembers={teamMembers}
-          setTeamMembers={setTeamMembers}
-          routineTasks={routineTasks}
-          setRoutineTasks={setRoutineTasks}
-          routineCategories={routineCategories}
-          setRoutineCategories={setRoutineCategories}
-          currentTime={currentTime}
-          notificationSettings={notificationSettings}
-          setNotificationSettings={setNotificationSettings}
+          onDataRefresh={loadData}
         />
       )}
 

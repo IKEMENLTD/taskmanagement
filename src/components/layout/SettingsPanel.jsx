@@ -10,28 +10,12 @@ import { getAllThemes, updateUserTheme } from '../../utils/themeUtils';
  * 設定パネルコンポーネント
  * @param {Function} onClose - パネルを閉じるハンドラー
  * @param {boolean} darkMode - ダークモードフラグ
- * @param {Array} projects - プロジェクト一覧
- * @param {Function} setProjects - プロジェクト更新関数
- * @param {Array} teamMembers - チームメンバー一覧
- * @param {Function} setTeamMembers - チームメンバー更新関数
- * @param {Object} routineTasks - ルーティンタスク一覧
- * @param {Function} setRoutineTasks - ルーティンタスク更新関数
- * @param {Array} routineCategories - ルーティンカテゴリー一覧
- * @param {Function} setRoutineCategories - ルーティンカテゴリー更新関数
- * @param {Date} currentTime - 現在時刻
+ * @param {Function} onDataRefresh - データ再読み込み関数
  */
 export const SettingsPanel = ({
   onClose,
   darkMode = false,
-  projects = [],
-  setProjects,
-  teamMembers = [],
-  setTeamMembers,
-  routineTasks = {},
-  setRoutineTasks,
-  routineCategories = [],
-  setRoutineCategories,
-  currentTime = new Date()
+  onDataRefresh
 }) => {
   // 認証情報
   const { user, theme, setTheme } = useAuth();
@@ -138,15 +122,8 @@ export const SettingsPanel = ({
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {activeTab === 'data' && (
             <DataManagementPanel
-              projects={projects}
-              setProjects={setProjects}
-              teamMembers={teamMembers}
-              setTeamMembers={setTeamMembers}
-              routineTasks={routineTasks}
-              setRoutineTasks={setRoutineTasks}
-              routineCategories={routineCategories}
-              setRoutineCategories={setRoutineCategories}
               darkMode={darkMode}
+              onDataRefresh={onDataRefresh}
             />
           )}
 
