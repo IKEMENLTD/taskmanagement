@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import {
   getLineSettings,
   saveLineSettings,
@@ -6,6 +6,7 @@ import {
   generateTeamReport,
   sendLineMessage
 } from '../utils/lineMessagingApiUtils';
+import { useAuth } from '../contexts/AuthContext';
 
 /**
  * LINE通知スケジューラーフック
@@ -14,11 +15,27 @@ import {
  */
 export const useLineNotifyScheduler = (projects, routineTasks) => {
   const lastCheckRef = useRef(null);
+  const { user } = useAuth();
+
+  // プロジェクトまたはユーザーIDから組織IDを取得
+  const organizationId = useMemo(() => {
+    // プロジェクトから組織IDを取得
+    if (projects && projects.length > 0 && projects[0].organization_id) {
+      return projects[0].organization_id;
+    }
+    // プロジェクトがない、または組織IDがない場合はユーザーIDを使用
+    return user?.id || null;
+  }, [projects, user]);
 
   useEffect(() => {
+    // organizationIdがない場合は処理をスキップ
+    if (!organizationId) {
+      return;
+    }
+
     // 設定を取得
     const checkAndSend = async () => {
-      const settings = getLineSettings();
+      const settings = await getLineSettings(organizationId);
 
       // 無効化されている場合はスキップ
       if (!settings.enabled) {
@@ -75,7 +92,7 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
             lastSentDate: now.toISOString().split('T')[0],
             lastSentDateTime: dateTimeString
           };
-          saveLineSettings(updatedSettings);
+          await saveLineSettings(organizationId, updatedSettings);
           console.log(`[LINE通知] 最終送信日時を更新: ${dateTimeString}`);
         } else {
           console.error('[LINE通知] ❌ 日報送信失敗:', result.error);
@@ -96,5 +113,5 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
       console.log('[LINE通知] スケジューラー停止');
       clearInterval(interval);
     };
-  }, [projects, routineTasks]);
+  }, [projects, routineTasks, organizationId]);
 };
