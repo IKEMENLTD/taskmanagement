@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Filter, X } from 'lucide-react';
 import {
   generateMonthCalendar,
   generateWeekCalendar,
@@ -40,6 +40,15 @@ export const CalendarView = ({
   // フィルター
   const [filterProject, setFilterProject] = useState('all');
   const [filterMember, setFilterMember] = useState('all');
+
+  // 日付選択モーダル
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDateEvents, setSelectedDateEvents] = useState([]);
+
+  // モーダル内フィルター
+  const [modalFilterType, setModalFilterType] = useState('all'); // all, task, routine
+  const [modalFilterProject, setModalFilterProject] = useState('all');
+  const [modalFilterMember, setModalFilterMember] = useState('all');
 
   // カレンダーデータを生成
   const calendarData = useMemo(() => {
@@ -105,13 +114,54 @@ export const CalendarView = ({
   };
 
   // イベントクリックハンドラー
-  const handleEventClick = (event) => {
+  const handleEventClick = (event, e) => {
+    e.stopPropagation(); // 日付クリックイベントの伝播を防ぐ
     if (event.type === 'task') {
       onTaskClick(event);
     } else if (event.type === 'routine' && onRoutineClick) {
       onRoutineClick(event);
     }
   };
+
+  // 日付セルクリックハンドラー
+  const handleDateClick = (date, events) => {
+    setSelectedDate(date);
+    setSelectedDateEvents(events);
+  };
+
+  // モーダルを閉じる
+  const closeModal = () => {
+    setSelectedDate(null);
+    setSelectedDateEvents([]);
+    // フィルターをリセット
+    setModalFilterType('all');
+    setModalFilterProject('all');
+    setModalFilterMember('all');
+  };
+
+  // モーダル内のイベントをフィルタリング
+  const filteredModalEvents = useMemo(() => {
+    let filtered = [...selectedDateEvents];
+
+    // タイプフィルター
+    if (modalFilterType !== 'all') {
+      filtered = filtered.filter(event => event.type === modalFilterType);
+    }
+
+    // プロジェクトフィルター（タスクのみ）
+    if (modalFilterProject !== 'all') {
+      filtered = filtered.filter(event =>
+        event.type !== 'task' || event.projectName === modalFilterProject
+      );
+    }
+
+    // 担当者フィルター
+    if (modalFilterMember !== 'all') {
+      filtered = filtered.filter(event => event.assignee === modalFilterMember);
+    }
+
+    return filtered;
+  }, [selectedDateEvents, modalFilterType, modalFilterProject, modalFilterMember]);
 
   // 表示タイトル
   const displayTitle = useMemo(() => {
@@ -244,11 +294,12 @@ export const CalendarView = ({
                 return (
                   <div
                     key={dayIndex}
-                    className={`min-h-[120px] p-2 border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${
+                    className={`min-h-[120px] p-2 border-r cursor-pointer ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${
                       !dayData.isCurrentMonth ? (darkMode ? 'bg-gray-900' : 'bg-gray-50') : ''
                     } ${weekend && dayData.isCurrentMonth ? (darkMode ? 'bg-gray-800' : 'bg-blue-50') : ''} ${
                       today ? (darkMode ? 'bg-blue-900/30' : 'bg-blue-100') : ''
                     } hover:${darkMode ? 'bg-gray-700' : 'bg-gray-100'} transition-colors`}
+                    onClick={() => handleDateClick(dayData.date, events)}
                   >
                     {/* 日付 */}
                     <div className={`text-sm font-semibold mb-2 ${
@@ -264,7 +315,7 @@ export const CalendarView = ({
                       {events.slice(0, 3).map((event, eventIndex) => (
                         <button
                           key={eventIndex}
-                          onClick={() => handleEventClick(event)}
+                          onClick={(e) => handleEventClick(event, e)}
                           className={`w-full text-left px-2 py-1 rounded text-xs truncate hover:opacity-80 transition-all`}
                           style={{
                             backgroundColor: getEventColor(event),
@@ -323,6 +374,198 @@ export const CalendarView = ({
           <Calendar size={48} className={`mx-auto mb-4 ${textSecondary}`} />
           <p className={`${textColor} text-lg font-semibold mb-2`}>表示するデータがありません</p>
           <p className={textSecondary}>プロジェクトやタスクを追加してください</p>
+        </div>
+      )}
+
+      {/* 日付詳細モーダル */}
+      {selectedDate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={closeModal}>
+          <div
+            className={`${cardBg} rounded-xl border shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* モーダルヘッダー */}
+            <div className={`flex items-center justify-between p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div>
+                <h3 className={`text-lg font-bold ${textColor}`}>
+                  {selectedDate.getFullYear()}年{selectedDate.getMonth() + 1}月{selectedDate.getDate()}日
+                  ({getDayName(selectedDate.getDay())})
+                </h3>
+                <p className={`text-sm ${textSecondary} mt-1`}>
+                  {filteredModalEvents.length}件のイベント
+                  {filteredModalEvents.length !== selectedDateEvents.length && (
+                    <span className="ml-1">（全{selectedDateEvents.length}件）</span>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={closeModal}
+                className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'} transition-colors`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* フィルター */}
+            <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} bg-opacity-50`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <Filter size={16} className={textSecondary} />
+
+                {/* タイプフィルター */}
+                <select
+                  value={modalFilterType}
+                  onChange={(e) => setModalFilterType(e.target.value)}
+                  className={`px-3 py-1.5 rounded-lg border text-sm ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'} ${textColor}`}
+                >
+                  <option value="all">全タイプ</option>
+                  <option value="task">タスクのみ</option>
+                  <option value="routine">ルーティンのみ</option>
+                </select>
+
+                {/* プロジェクトフィルター */}
+                <select
+                  value={modalFilterProject}
+                  onChange={(e) => setModalFilterProject(e.target.value)}
+                  className={`px-3 py-1.5 rounded-lg border text-sm ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'} ${textColor}`}
+                >
+                  <option value="all">全プロジェクト</option>
+                  {[...new Set(selectedDateEvents
+                    .filter(e => e.type === 'task' && e.projectName)
+                    .map(e => e.projectName)
+                  )].map(projectName => (
+                    <option key={projectName} value={projectName}>{projectName}</option>
+                  ))}
+                </select>
+
+                {/* 担当者フィルター */}
+                <select
+                  value={modalFilterMember}
+                  onChange={(e) => setModalFilterMember(e.target.value)}
+                  className={`px-3 py-1.5 rounded-lg border text-sm ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'} ${textColor}`}
+                >
+                  <option value="all">全担当者</option>
+                  {[...new Set(selectedDateEvents
+                    .filter(e => e.assignee)
+                    .map(e => e.assignee)
+                  )].map(assignee => (
+                    <option key={assignee} value={assignee}>{assignee}</option>
+                  ))}
+                </select>
+
+                {/* フィルターリセットボタン */}
+                {(modalFilterType !== 'all' || modalFilterProject !== 'all' || modalFilterMember !== 'all') && (
+                  <button
+                    onClick={() => {
+                      setModalFilterType('all');
+                      setModalFilterProject('all');
+                      setModalFilterMember('all');
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-sm ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'} ${textColor} transition-colors`}
+                  >
+                    リセット
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* モーダルボディ */}
+            <div className="p-4 overflow-y-auto max-h-[calc(80vh-160px)]">
+              {filteredModalEvents.length === 0 ? (
+                <div className="text-center py-8">
+                  <Calendar size={48} className={`mx-auto mb-4 ${textSecondary}`} />
+                  <p className={`${textSecondary}`}>
+                    {selectedDateEvents.length === 0
+                      ? 'この日にイベントはありません'
+                      : 'フィルター条件に一致するイベントがありません'
+                    }
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {filteredModalEvents.map((event, index) => (
+                    <button
+                      key={index}
+                      onClick={(e) => handleEventClick(event, e)}
+                      className={`w-full text-left p-3 rounded-lg border transition-all hover:shadow-md ${
+                        darkMode ? 'border-gray-700 hover:bg-gray-700' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* カラーインジケーター */}
+                        <div
+                          className="w-1 h-full rounded-full flex-shrink-0 mt-1"
+                          style={{
+                            backgroundColor: getEventColor(event),
+                            minHeight: '40px'
+                          }}
+                        ></div>
+
+                        {/* イベント情報 */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-base">
+                              {event.type === 'routine' && '📋'}
+                              {event.type === 'task' && '✓'}
+                            </span>
+                            <h4 className={`font-semibold ${textColor} truncate`}>
+                              {event.name || event.title}
+                            </h4>
+                          </div>
+
+                          {/* プロジェクト名（タスクの場合） */}
+                          {event.type === 'task' && event.projectName && (
+                            <p className={`text-sm ${textSecondary} mb-1`}>
+                              📁 {event.projectName}
+                            </p>
+                          )}
+
+                          {/* 担当者 */}
+                          {event.assignee && (
+                            <p className={`text-sm ${textSecondary} mb-1`}>
+                              👤 {event.assignee}
+                            </p>
+                          )}
+
+                          {/* ルーティンの時刻 */}
+                          {event.type === 'routine' && event.time && (
+                            <p className={`text-sm ${textSecondary}`}>
+                              🕐 {event.time}
+                            </p>
+                          )}
+
+                          {/* タスクの優先度 */}
+                          {event.type === 'task' && event.priority && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                              event.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                              event.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
+                              event.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                              'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            }`}>
+                              {event.priority === 'urgent' && '🔴 緊急'}
+                              {event.priority === 'high' && '🟠 高'}
+                              {event.priority === 'medium' && '🟡 中'}
+                              {event.priority === 'low' && '🟢 低'}
+                            </span>
+                          )}
+
+                          {/* ルーティンの完了状態 */}
+                          {event.type === 'routine' && (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${
+                              event.completed
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                                : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                            }`}>
+                              {event.completed ? '✓ 完了' : '○ 未完了'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

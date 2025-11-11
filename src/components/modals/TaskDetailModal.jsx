@@ -52,6 +52,9 @@ export const TaskDetailModal = ({
   // サブタスク入力
   const [newSubtaskName, setNewSubtaskName] = useState('');
 
+  // 依存関係追加用の選択タスクID
+  const [selectedDependencyId, setSelectedDependencyId] = useState('');
+
   // ファイルアップロード用の参照
   const fileInputRef = React.useRef(null);
 
@@ -806,30 +809,49 @@ export const TaskDetailModal = ({
 
                     {/* 依存元タスク（このタスクが依存しているタスク） */}
                     <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className={`font-semibold ${textColor}`}>依存元タスク ({dependencyTasks.length})</h4>
-                        {isEditing && (
+                      <h4 className={`font-semibold ${textColor} mb-3`}>依存元タスク ({dependencyTasks.length})</h4>
+
+                      {/* 依存タスク追加フォーム */}
+                      <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4 mb-3`}>
+                        <div className="flex gap-2">
+                          <select
+                            value={selectedDependencyId}
+                            onChange={(e) => setSelectedDependencyId(e.target.value)}
+                            className={`flex-1 px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                          >
+                            <option value="">依存元タスクを選択...</option>
+                            {allTasks
+                              .filter(t =>
+                                t.id !== task.id && // 自分自身は除外
+                                !(editedTask.dependencies || []).includes(t.id) // 既に依存関係にあるタスクは除外
+                              )
+                              .map(t => (
+                                <option key={t.id} value={t.id}>
+                                  [{t.projectName}] {t.name}
+                                </option>
+                              ))
+                            }
+                          </select>
                           <button
                             onClick={() => {
-                              // 依存タスク追加ダイアログを表示（簡易版）
-                              const taskId = prompt('依存元タスクIDを入力してください:');
-                              if (taskId) {
-                                const numId = parseInt(taskId);
-                                const depTask = allTasks.find(t => t.id === numId);
-                                if (depTask) {
-                                  const newDeps = [...(editedTask.dependencies || []), numId];
-                                  setEditedTask({ ...editedTask, dependencies: newDeps });
-                                } else {
-                                  alert('タスクが見つかりません');
-                                }
+                              if (!selectedDependencyId) {
+                                alert('タスクを選択してください');
+                                return;
                               }
+                              const numId = parseInt(selectedDependencyId);
+                              const newDeps = [...(editedTask.dependencies || []), numId];
+                              const updatedTask = { ...editedTask, dependencies: newDeps };
+                              setEditedTask(updatedTask);
+                              onUpdateTask(updatedTask);
+                              setSelectedDependencyId('');
                             }}
-                            className={`flex items-center gap-1 text-sm ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'}`}
+                            disabled={!selectedDependencyId}
+                            className={`${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white px-4 py-2 rounded-lg text-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed`}
                           >
-                            <Plus size={16} />
+                            <Plus size={14} />
                             追加
                           </button>
-                        )}
+                        </div>
                       </div>
 
                       {dependencyTasks.length === 0 ? (
@@ -872,18 +894,18 @@ export const TaskDetailModal = ({
                                     </div>
                                   </div>
                                 </div>
-                                {isEditing && (
-                                  <button
-                                    onClick={() => {
-                                      const newDeps = editedTask.dependencies.filter(id => id !== depTask.id);
-                                      setEditedTask({ ...editedTask, dependencies: newDeps });
-                                    }}
-                                    className={`${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'} p-2 transition-colors flex-shrink-0`}
-                                    title="削除"
-                                  >
-                                    <X size={16} />
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => {
+                                    const newDeps = editedTask.dependencies.filter(id => id !== depTask.id);
+                                    const updatedTask = { ...editedTask, dependencies: newDeps };
+                                    setEditedTask(updatedTask);
+                                    onUpdateTask(updatedTask);
+                                  }}
+                                  className={`${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'} p-2 transition-colors flex-shrink-0`}
+                                  title="削除"
+                                >
+                                  <X size={16} />
+                                </button>
                               </div>
                             </div>
                           ))}

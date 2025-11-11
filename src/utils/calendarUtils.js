@@ -110,14 +110,32 @@ export const isWeekend = (date) => {
  */
 export const getEventsForDate = (date, projects, routineTasks) => {
   const dateStr = getDateString(date);
+  const checkDate = new Date(date);
+  checkDate.setHours(0, 0, 0, 0);
 
   // タスク
   const tasks = [];
   projects.forEach(project => {
     if (project.tasks) {
       project.tasks.forEach(task => {
-        // 開始日、期限、完了日が該当日の場合
-        if (task.startDate === dateStr || task.dueDate === dateStr || task.completedDate === dateStr) {
+        // タスクの開始日と期限日をチェック
+        if (task.startDate && task.dueDate) {
+          const taskStart = new Date(task.startDate);
+          taskStart.setHours(0, 0, 0, 0);
+          const taskEnd = new Date(task.dueDate);
+          taskEnd.setHours(0, 0, 0, 0);
+
+          // 指定日がタスクの期間内にある場合
+          if (checkDate >= taskStart && checkDate <= taskEnd) {
+            tasks.push({
+              ...task,
+              projectName: project.name,
+              projectColor: project.color,
+              type: 'task'
+            });
+          }
+        } else if (task.dueDate === dateStr) {
+          // 期限日のみ設定されている場合
           tasks.push({
             ...task,
             projectName: project.name,

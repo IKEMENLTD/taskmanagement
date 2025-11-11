@@ -33,6 +33,9 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
   // 依存関係表示切り替え
   const [showDependencies, setShowDependencies] = useState(true);
 
+  // ホバーされたタスクID
+  const [hoveredTaskId, setHoveredTaskId] = useState(null);
+
   // 表示範囲を取得
   const { startDate, endDate } = useMemo(() => {
     return getViewRange(viewMode, baseDate);
@@ -291,12 +294,12 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
 
                       {/* プロジェクトバー */}
                       {(() => {
-                        // プロジェクトのタイムラインを取得、なければタスクから計算
-                        let projectStart = project.timeline?.start;
-                        let projectEnd = project.timeline?.end;
+                        // 常にタスクの実際の期間から計算（timeline設定を無視）
+                        let projectStart = null;
+                        let projectEnd = null;
 
-                        // タイムラインが設定されていない、またはnull/undefinedの場合はタスクの範囲を使用
-                        if ((!projectStart || !projectEnd || projectStart === 'null' || projectEnd === 'null') && project.tasks && project.tasks.length > 0) {
+                        // タスクの範囲から計算
+                        if (project.tasks && project.tasks.length > 0) {
                           const taskDates = project.tasks
                             .filter(t => t.startDate && t.dueDate)
                             .map(t => ({
@@ -318,19 +321,11 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
 
                             projectStart = formatDate(minStart);
                             projectEnd = formatDate(maxEnd);
-
-                            console.log(`📊 プロジェクト「${project.name}」の期間を計算:`);
-                            console.log(`  タスク数: ${project.tasks.length}, 有効なタスク: ${taskDates.length}`);
-                            console.log(`  計算された期間: ${projectStart} 〜 ${projectEnd}`);
                           }
-                        } else {
-                          console.log(`📊 プロジェクト「${project.name}」:`);
-                          console.log(`  timeline設定: ${projectStart} 〜 ${projectEnd}`);
                         }
 
-                        // それでも日付がない場合は表示しない
-                        if (!projectStart || !projectEnd || projectStart === 'null' || projectEnd === 'null') {
-                          console.log(`⚠️ プロジェクト「${project.name}」: 日付データがないため非表示`);
+                        // 日付データがない場合は表示しない
+                        if (!projectStart || !projectEnd) {
                           return null;
                         }
 
@@ -341,11 +336,9 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                           CHART_WIDTH
                         );
 
-                        console.log(`  表示位置: left=${position.left}%, width=${position.width}%`);
-
                         return (
                           <div
-                            className="absolute top-1/2 transform -translate-y-1/2 h-6 rounded flex items-center justify-center text-white text-xs font-semibold shadow-lg"
+                            className="absolute top-1/2 transform -translate-y-1/2 h-6 rounded flex items-center justify-between px-2 text-white text-xs font-semibold shadow-lg"
                             style={{
                               left: `${position.left}%`,
                               width: `${position.width}%`,
@@ -353,7 +346,7 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                               opacity: 0.8
                             }}
                           >
-                            {position.width > 10 && `${project.progress}%`}
+                            {position.width > 10 && <span>{project.progress}%</span>}
                           </div>
                         );
                       })()}
@@ -367,6 +360,8 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                       className={`flex items-center hover:${darkMode ? 'bg-gray-700' : 'bg-gray-50'} transition-colors cursor-pointer`}
                       style={{ height: '38px' }}
                       onClick={() => onTaskClick({ ...task, projectName: project.name, projectId: project.id })}
+                      onMouseEnter={() => setHoveredTaskId(task.id)}
+                      onMouseLeave={() => setHoveredTaskId(null)}
                     >
                       <div className={`border-r ${darkMode ? 'border-gray-700' : 'border-gray-200'} ${textColor} flex items-center pl-6 pr-2`} style={{ height: '38px', minWidth: '256px', maxWidth: '256px', width: '256px' }}>
                         <div className="flex-1 overflow-hidden min-w-0">
@@ -405,29 +400,62 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                           const position = calculateTaskPosition(task, startDate, endDate, CHART_WIDTH);
                           const delayed = isTaskDelayed(task);
 
-                          return (
-                            <div
-                              className="absolute top-1/2 transform -translate-y-1/2 h-5 rounded flex items-center justify-between px-2 text-white text-xs shadow"
-                              style={{
-                                left: `${position.left}%`,
-                                width: `${position.width}%`,
-                                backgroundColor: delayed ? '#ef4444' : project.color,
-                                opacity: task.status === 'completed' ? 0.5 : 0.9
-                              }}
-                            >
-                              {position.width > 15 && (
-                                <>
-                                  <span className="text-xs">{task.progress}%</span>
-                                  {delayed && <span className="text-xs">⚠️</span>}
-                                </>
-                              )}
+                          // 関連タスクかどうかをチェック
+                          let isRelated = false;
+                          if (showDependencies && hoveredTaskId !== null && hoveredTaskId !== task.id) {
+                            const allTasks = getAllTasksFromProjects(projects);
+                            const hoveredTask = allTasks.find(t => t.id === hoveredTaskId);
 
-                              {/* 進捗バー */}
+                            if (hoveredTask) {
+                              // このタスクが依存元（hoveredTaskが依存している）
+                              const isDependency = (hoveredTask.dependencies || []).includes(task.id);
+                              // このタスクが依存先（このタスクがhoveredTaskに依存している）
+                              const isDependent = (task.dependencies || []).includes(hoveredTaskId);
+
+                              isRelated = isDependency || isDependent;
+                            }
+                          }
+
+                          return (
+                            <>
                               <div
-                                className="absolute left-0 top-0 bottom-0 bg-white opacity-20 rounded"
-                                style={{ width: `${task.progress}%` }}
-                              ></div>
-                            </div>
+                                className={`absolute top-1/2 transform -translate-y-1/2 h-5 rounded flex items-center justify-between px-2 text-white text-xs shadow transition-all duration-300 ${
+                                  isRelated ? 'ring-4 ring-yellow-400 shadow-2xl scale-110 z-20' : ''
+                                }`}
+                                style={{
+                                  left: `${position.left}%`,
+                                  width: `${position.width}%`,
+                                  backgroundColor: delayed ? '#ef4444' : project.color,
+                                  opacity: task.status === 'completed' ? 0.5 : (isRelated ? 1 : 0.9),
+                                  boxShadow: isRelated ? '0 0 20px rgba(250, 204, 21, 0.8)' : undefined
+                                }}
+                              >
+                                {(position.width > 15 || delayed) && (
+                                  <>
+                                    <span className="text-xs">{task.progress}%</span>
+                                    {delayed && position.width > 15 && <span className="text-xs">⚠️</span>}
+                                  </>
+                                )}
+
+                                {/* 進捗バー */}
+                                <div
+                                  className="absolute left-0 top-0 bottom-0 bg-white opacity-20 rounded"
+                                  style={{ width: `${task.progress}%` }}
+                                ></div>
+                              </div>
+
+                              {/* バーが狭い場合は右横に注意マークを表示 */}
+                              {delayed && position.width <= 15 && (
+                                <div
+                                  className="absolute top-1/2 transform -translate-y-1/2 text-xs"
+                                  style={{
+                                    left: `${position.left + position.width + 1}%`,
+                                  }}
+                                >
+                                  ⚠️
+                                </div>
+                              )}
+                            </>
                           );
                         })()}
                       </div>
@@ -436,103 +464,78 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                 </div>
               ))}
 
-              {/* 依存関係の矢印（SVGレイヤー） */}
-              {showDependencies && (() => {
+              {/* 依存関係の吹き出し表示 */}
+              {showDependencies && hoveredTaskId !== null && (() => {
                 const allTasks = getAllTasksFromProjects(projects);
-                const arrows = [];
-                let currentY = 45; // プロジェクト行の高さ
+                const currentTask = allTasks.find(t => t.id === hoveredTaskId);
 
-                filteredData.forEach((project) => {
-                  currentY += 45; // プロジェクト行をスキップ
+                if (!currentTask) return null;
 
-                  project.tasks.forEach((task, taskIndex) => {
-                    if (task.dependencies && task.dependencies.length > 0) {
-                      task.dependencies.forEach(depId => {
-                        const depTask = allTasks.find(t => t.id === depId);
-                        if (depTask) {
-                          // 依存元タスクの位置を探す
-                          let depY = 45;
-                          let found = false;
+                // 依存元タスク（このタスクが依存しているタスク）
+                const dependencyTasks = (currentTask.dependencies || [])
+                  .map(depId => allTasks.find(t => t.id === depId))
+                  .filter(t => t);
 
-                          filteredData.forEach((proj) => {
-                            if (found) return;
-                            depY += 45; // プロジェクト行
+                // 依存先タスク（このタスクに依存しているタスク）
+                const dependentTasks = allTasks.filter(t =>
+                  (t.dependencies || []).includes(hoveredTaskId)
+                );
 
-                            proj.tasks.forEach((t) => {
-                              if (found) return;
-                              if (t.id === depId) {
-                                found = true;
-                                return;
-                              }
-                              depY += 38; // タスク行
-                            });
-
-                            if (!found) {
-                              // このプロジェクトにはなかった、次のプロジェクトへ
-                            }
-                          });
-
-                          if (found) {
-                            const fromPos = calculateTaskPosition(depTask, startDate, endDate, 100);
-                            const toPos = calculateTaskPosition(task, startDate, endDate, 100);
-
-                            arrows.push({
-                              key: `${depId}-${task.id}`,
-                              fromX: fromPos.left + fromPos.width,
-                              fromY: depY,
-                              toX: toPos.left,
-                              toY: currentY + (taskIndex * 38),
-                              color: darkMode ? '#60a5fa' : '#3b82f6'
-                            });
-                          }
-                        }
-                      });
-                    }
-                  });
-
-                  currentY += project.tasks.length * 38;
-                });
-
-                if (arrows.length === 0) return null;
+                if (dependencyTasks.length === 0 && dependentTasks.length === 0) return null;
 
                 return (
-                  <svg
-                    className="absolute top-0 left-0 pointer-events-none"
+                  <div
+                    className={`absolute z-50 ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-300'} border-2 rounded-lg shadow-2xl p-4 pointer-events-none`}
                     style={{
-                      width: '100%',
-                      height: '100%',
-                      zIndex: 5
+                      top: '100px',
+                      right: '20px',
+                      minWidth: '280px',
+                      maxWidth: '400px'
                     }}
                   >
-                    {arrows.map(arrow => {
-                      // 矢印のパスを生成
-                      const midX = (arrow.fromX + arrow.toX) / 2;
-                      const path = `M ${arrow.fromX + 256}% ${arrow.fromY + 19}
-                                    L ${midX + 256}% ${arrow.fromY + 19}
-                                    L ${midX + 256}% ${arrow.toY + 19}
-                                    L ${arrow.toX + 256}% ${arrow.toY + 19}`;
+                    <div className={`text-sm font-bold ${textColor} mb-3 flex items-center gap-2`}>
+                      <GitBranch size={16} />
+                      依存関係
+                    </div>
 
-                      return (
-                        <g key={arrow.key}>
-                          {/* 矢印のライン */}
-                          <path
-                            d={path}
-                            stroke={arrow.color}
-                            strokeWidth="2"
-                            fill="none"
-                            strokeDasharray="4,4"
-                            opacity="0.6"
-                          />
-                          {/* 矢印のヘッド */}
-                          <polygon
-                            points={`${arrow.toX + 256},${arrow.toY + 19} ${arrow.toX + 256 - 6},${arrow.toY + 19 - 4} ${arrow.toX + 256 - 6},${arrow.toY + 19 + 4}`}
-                            fill={arrow.color}
-                            opacity="0.6"
-                          />
-                        </g>
-                      );
-                    })}
-                  </svg>
+                    {/* 依存元タスク */}
+                    {dependencyTasks.length > 0 && (
+                      <div className="mb-3">
+                        <div className={`text-xs font-semibold ${textSecondary} mb-2`}>
+                          📌 依存元（先に完了が必要）
+                        </div>
+                        <div className="space-y-1">
+                          {dependencyTasks.map(task => (
+                            <div
+                              key={task.id}
+                              className={`text-xs ${darkMode ? 'bg-blue-900/30' : 'bg-blue-50'} rounded px-2 py-1.5 ${textColor}`}
+                            >
+                              • {task.name}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 依存先タスク */}
+                    {dependentTasks.length > 0 && (
+                      <div>
+                        <div className={`text-xs font-semibold ${textSecondary} mb-2`}>
+                          🎯 依存先（これの完了を待っている）
+                        </div>
+                        <div className="space-y-1">
+                          {dependentTasks.map(task => (
+                            <div
+                              key={task.id}
+                              className={`text-xs ${darkMode ? 'bg-green-900/30' : 'bg-green-50'} rounded px-2 py-1.5 ${textColor}`}
+                            >
+                              • {task.name}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })()}
             </div>

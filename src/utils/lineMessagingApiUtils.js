@@ -2,6 +2,8 @@
  * LINE Messaging API ユーティリティ
  */
 
+import { supabase } from '../lib/supabase';
+
 // Vercel Functionsのエンドポイント
 // ローカル開発時は 'http://localhost:3000/api/send-line-message'
 // 本番環境では '/api/send-line-message'（相対パス）
@@ -190,25 +192,113 @@ export const generateTeamReport = (selectedMembers, projects, routineTasks, date
 };
 
 /**
- * LINE Messaging API設定を保存
+ * LINE Messaging API設定を保存（Supabase）
  */
-export const saveLineSettings = (settings) => {
+export const saveLineSettings = async (organizationId, settings) => {
   try {
+    // デバッグ情報
+    console.log('[saveLineSettings] organizationId:', organizationId);
+    console.log('[saveLineSettings] settings:', settings);
+
+    if (!organizationId) {
+      throw new Error('organizationIdが指定されていません。ユーザーが組織に所属していない可能性があります。');
+    }
+
+    const { data: existingSettings, error: selectError } = await supabase
+      .from('line_settings')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .single();
+
+    // PGRST116 = データが見つからない（正常）、それ以外はエラー
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('[saveLineSettings] 既存設定の取得エラー:', selectError);
+      throw new Error(`既存設定の取得に失敗: ${selectError.message} (code: ${selectError.code})`);
+    }
+
+    const settingsData = {
+      organization_id: organizationId,
+      enabled: settings.enabled || false,
+      channel_access_token: settings.channelAccessToken || '',
+      group_id: settings.groupId || '',
+      scheduled_time: settings.scheduledTime || '18:30',
+      selected_members: settings.selectedMembers || [],
+      last_sent_date: settings.lastSentDate || null
+    };
+
+    console.log('[saveLineSettings] settingsData:', settingsData);
+
+    let result;
+    if (existingSettings) {
+      // 更新
+      console.log('[saveLineSettings] 既存設定を更新します');
+      result = await supabase
+        .from('line_settings')
+        .update(settingsData)
+        .eq('organization_id', organizationId);
+    } else {
+      // 新規作成
+      console.log('[saveLineSettings] 新規設定を作成します');
+      result = await supabase
+        .from('line_settings')
+        .insert([settingsData]);
+    }
+
+    console.log('[saveLineSettings] result:', result);
+
+    if (result.error) {
+      console.error('[saveLineSettings] 保存エラー:', result.error);
+      throw new Error(`保存エラー: ${result.error.message} (code: ${result.error.code})`);
+    }
+
+    // localStorage にもバックアップとして保存（オフライン時用）
     localStorage.setItem('lineMessagingApiSettings', JSON.stringify(settings));
-    return true;
+
+    console.log('[saveLineSettings] 保存成功');
+    return { success: true };
   } catch (error) {
-    console.error('LINE設定の保存に失敗しました:', error);
-    return false;
+    console.error('[saveLineSettings] エラー:', error);
+    return { success: false, error: error.message };
   }
 };
 
 /**
- * LINE Messaging API設定を取得
+ * LINE Messaging API設定を取得（Supabase）
  */
-export const getLineSettings = () => {
+export const getLineSettings = async (organizationId) => {
   try {
-    const settings = localStorage.getItem('lineMessagingApiSettings');
-    return settings ? JSON.parse(settings) : {
+    const { data, error } = await supabase
+      .from('line_settings')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = データが見つからない
+      throw error;
+    }
+
+    if (data) {
+      return {
+        enabled: data.enabled || false,
+        channelAccessToken: data.channel_access_token || '',
+        groupId: data.group_id || '',
+        scheduledTime: data.scheduled_time || '18:30',
+        selectedMembers: data.selected_members || [],
+        lastSentDate: data.last_sent_date || null
+      };
+    }
+
+    // データがない場合はlocalStorageから取得を試みる（マイグレーション用）
+    const localSettings = localStorage.getItem('lineMessagingApiSettings');
+    if (localSettings) {
+      const parsed = JSON.parse(localSettings);
+      // localStorageからSupabaseに移行
+      await saveLineSettings(organizationId, parsed);
+      return parsed;
+    }
+
+    // デフォルト値
+    return {
       enabled: false,
       channelAccessToken: '',
       groupId: '',
@@ -218,6 +308,17 @@ export const getLineSettings = () => {
     };
   } catch (error) {
     console.error('LINE設定の取得に失敗しました:', error);
+
+    // エラー時はlocalStorageから取得
+    try {
+      const localSettings = localStorage.getItem('lineMessagingApiSettings');
+      if (localSettings) {
+        return JSON.parse(localSettings);
+      }
+    } catch (e) {
+      console.error('localStorageからの取得も失敗:', e);
+    }
+
     return {
       enabled: false,
       channelAccessToken: '',

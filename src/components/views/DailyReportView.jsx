@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar, Copy, Download, FileText, CheckCircle, Target, Clock, User, Send } from 'lucide-react';
 import { getLineSettings, generateMemberReport, generateTeamReport, sendLineMessage } from '../../utils/lineMessagingApiUtils';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * 日報ビューコンポーネント
@@ -14,6 +15,19 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
   const textColor = darkMode ? 'text-gray-100' : 'text-gray-900';
   const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-500';
 
+  // 認証情報
+  const { user } = useAuth();
+
+  // プロジェクトまたはユーザーIDから組織IDを取得
+  const organizationId = useMemo(() => {
+    // プロジェクトから組織IDを取得
+    if (projects && projects.length > 0 && projects[0].organization_id) {
+      return projects[0].organization_id;
+    }
+    // プロジェクトがない、または組織IDがない場合はユーザーIDを使用
+    return user?.id || null;
+  }, [projects, user]);
+
   // 日付選択
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedMember, setSelectedMember] = useState('all');
@@ -21,8 +35,26 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
   const [isSendingLine, setIsSendingLine] = useState(false);
   const [lineMessage, setLineMessage] = useState({ type: '', text: '' });
 
-  // LINE設定を取得
-  const lineSettings = getLineSettings();
+  // LINE設定
+  const [lineSettings, setLineSettings] = useState({
+    enabled: false,
+    channelAccessToken: '',
+    groupId: '',
+    scheduledTime: '18:30',
+    selectedMembers: [],
+    lastSentDate: null
+  });
+
+  // LINE設定を読み込む
+  useEffect(() => {
+    const loadLineSettings = async () => {
+      if (organizationId) {
+        const settings = await getLineSettings(organizationId);
+        setLineSettings(settings);
+      }
+    };
+    loadLineSettings();
+  }, [organizationId]);
 
   // 日報データを集計
   const reportData = useMemo(() => {

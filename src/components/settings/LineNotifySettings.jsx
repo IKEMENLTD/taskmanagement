@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Bell, Send, Check, X, Clock, Users, HelpCircle, Edit2, Lock, RotateCcw } from 'lucide-react';
 import {
   getLineSettings,
   saveLineSettings,
   sendTestMessage
 } from '../../utils/lineMessagingApiUtils';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * LINE Messaging API設定コンポーネント
@@ -15,13 +16,48 @@ export const LineNotifySettings = ({
   projects = [],
   routineTasks = {}
 }) => {
-  const [settings, setSettings] = useState(getLineSettings());
-  const [originalSettings, setOriginalSettings] = useState(getLineSettings());
+  const { user } = useAuth();
+
+  // プロジェクトまたはユーザーIDから組織IDを取得
+  const organizationId = useMemo(() => {
+    // プロジェクトから組織IDを取得
+    if (projects && projects.length > 0 && projects[0].organization_id) {
+      return projects[0].organization_id;
+    }
+    // プロジェクトがない、または組織IDがない場合はユーザーIDを使用
+    // （ユーザーごとに設定を管理）
+    return user?.id || null;
+  }, [projects, user]);
+
+  const [settings, setSettings] = useState({
+    enabled: false,
+    channelAccessToken: '',
+    groupId: '',
+    scheduledTime: '18:30',
+    selectedMembers: [],
+    lastSentDate: null
+  });
+  const [originalSettings, setOriginalSettings] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [showHelp, setShowHelp] = useState(false);
   const [isEditingCredentials, setIsEditingCredentials] = useState(false);
+
+  // 設定を読み込む
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (organizationId) {
+        setIsLoading(true);
+        const loaded = await getLineSettings(organizationId);
+        setSettings(loaded);
+        setOriginalSettings(loaded);
+        setIsLoading(false);
+      }
+    };
+    loadSettings();
+  }, [organizationId]);
 
   const textColor = darkMode ? 'text-gray-100' : 'text-gray-900';
   const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-500';
@@ -87,7 +123,7 @@ export const LineNotifySettings = ({
   };
 
   // 最終送信日をリセット
-  const handleResetLastSent = () => {
+  const handleResetLastSent = async () => {
     if (!window.confirm('最終送信日をリセットしますか？\n\nリセットすると、本日の自動送信が再度実行可能になります。')) {
       return;
     }
@@ -98,13 +134,13 @@ export const LineNotifySettings = ({
       lastSentDateTime: null
     };
 
-    const success = saveLineSettings(updatedSettings);
+    const result = await saveLineSettings(organizationId, updatedSettings);
 
-    if (success) {
+    if (result.success) {
       setSettings(updatedSettings);
       setMessage({ type: 'success', text: '最終送信日をリセットしました。自動送信が再度実行可能です。' });
     } else {
-      setMessage({ type: 'error', text: 'リセットに失敗しました' });
+      setMessage({ type: 'error', text: 'リセットに失敗しました: ' + (result.error || '') });
     }
 
     setTimeout(() => {
@@ -113,7 +149,7 @@ export const LineNotifySettings = ({
   };
 
   // 保存
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
 
     if (!settings.channelAccessToken.trim()) {
@@ -143,9 +179,9 @@ export const LineNotifySettings = ({
       warningMessage = '⚠️ 送信対象メンバーが未選択です。自動送信は実行されません。';
     }
 
-    const success = saveLineSettings(settings);
+    const result = await saveLineSettings(organizationId, settings);
 
-    if (success) {
+    if (result.success) {
       setOriginalSettings({ ...settings });
       setIsEditingCredentials(false);
       if (warningMessage) {
@@ -154,7 +190,7 @@ export const LineNotifySettings = ({
         setMessage({ type: 'success', text: '設定を保存しました' });
       }
     } else {
-      setMessage({ type: 'error', text: '設定の保存に失敗しました' });
+      setMessage({ type: 'error', text: `設定の保存に失敗しました: ${result.error || ''}` });
     }
 
     setIsSaving(false);
@@ -244,7 +280,7 @@ export const LineNotifySettings = ({
         lastSentDate: now.toISOString().split('T')[0],
         lastSentDateTime: dateTimeString
       };
-      saveLineSettings(updatedSettings);
+      saveLineSettings(user.organizationId, updatedSettings);
       setSettings(updatedSettings);
     } else {
       setMessage({ type: 'error', text: `日報送信に失敗しました: ${result.error}` });
@@ -559,6 +595,20 @@ export const LineNotifySettings = ({
             送信先のLINEグループのID。「C」から始まる英数字の文字列です。
           </p>
         </div>
+
+        {/* 認証情報編集時の保存ボタン */}
+        {isEditingCredentials && (
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !settings.channelAccessToken.trim() || !settings.groupId.trim()}
+              className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-green-500 hover:bg-green-600 text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Check size={20} />
+              {isSaving ? '保存中...' : '認証情報を保存'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
