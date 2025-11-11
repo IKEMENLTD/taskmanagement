@@ -35,6 +35,9 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
   const [isSendingLine, setIsSendingLine] = useState(false);
   const [lineMessage, setLineMessage] = useState({ type: '', text: '' });
 
+  // 自由記述欄（メンバー別）
+  const [memberNotes, setMemberNotes] = useState({});
+
   // LINE設定
   const [lineSettings, setLineSettings] = useState({
     enabled: false,
@@ -55,6 +58,13 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
     };
     loadLineSettings();
   }, [organizationId]);
+
+  // メンバーの記述を更新
+  const updateMemberNote = (member, note) => {
+    const key = `daily_report_notes_${selectedDate}_${member}`;
+    localStorage.setItem(key, note);
+    setMemberNotes(prev => ({ ...prev, [member]: note }));
+  };
 
   // 日報データを集計
   const reportData = useMemo(() => {
@@ -128,6 +138,22 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
         : 0
     };
   }, [selectedDate, selectedMember, projects, routineTasks]);
+
+  // 日付変更時に全メンバーの記述をlocalStorageから読み込む
+  useEffect(() => {
+    const loadMemberNotes = () => {
+      const notes = {};
+      teamMembers.forEach(member => {
+        const key = `daily_report_notes_${selectedDate}_${member.name}`;
+        const savedNote = localStorage.getItem(key);
+        if (savedNote) {
+          notes[member.name] = savedNote;
+        }
+      });
+      setMemberNotes(notes);
+    };
+    loadMemberNotes();
+  }, [selectedDate, teamMembers]);
 
   // 日報テキストを生成（自動送信と同じフォーマット）
   const generateReportText = () => {
@@ -296,6 +322,17 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
           section += ` ※${routine.skip_reason}`;
         }
         section += `\n`;
+      });
+    }
+
+    // 自由記述（その他の活動）
+    const memberNote = memberNotes[member];
+    if (memberNote && memberNote.trim()) {
+      section += `\n📝 その他の活動\n`;
+      memberNote.trim().split('\n').forEach(line => {
+        if (line.trim()) {
+          section += `• ${line.trim()}\n`;
+        }
       });
     }
 
@@ -523,6 +560,58 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
             </div>
           </div>
         </div>
+      </div>
+
+      {/* 自由記述欄（その他の活動） */}
+      <div className={`${cardBg} rounded-xl p-6 border`}>
+        <h3 className={`text-xl font-bold ${textColor} mb-4 flex items-center gap-2`}>
+          <FileText size={20} />
+          📝 その他の活動・自由記述
+        </h3>
+        <p className={`text-sm ${textSecondary} mb-3`}>
+          タスクやルーティン以外で今日やったことを自由に記入してください（1行1項目）
+        </p>
+
+        {selectedMember === 'all' ? (
+          /* チーム全体表示の場合：各メンバーの入力欄を表示 */
+          <div className="space-y-4">
+            {teamMembers.map((member) => (
+              <div key={member.name} className={`p-4 rounded-lg border ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-300'}`}>
+                <label className={`block text-sm font-medium ${textColor} mb-2`}>
+                  👤 {member.name}さん
+                </label>
+                <textarea
+                  value={memberNotes[member.name] || ''}
+                  onChange={(e) => updateMemberNote(member.name, e.target.value)}
+                  placeholder={`例:\n・チームミーティングで○○について議論\n・○○さんからの相談対応\n・新しいツールの調査`}
+                  rows={4}
+                  className={`w-full px-4 py-3 rounded-lg border ${
+                    darkMode
+                      ? 'bg-gray-800 border-gray-600 text-white placeholder-gray-500'
+                      : 'bg-white border-gray-200 text-gray-900 placeholder-gray-400'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* 個人表示の場合：選択中のメンバーの入力欄のみ表示 */
+          <textarea
+            value={memberNotes[selectedMember] || ''}
+            onChange={(e) => updateMemberNote(selectedMember, e.target.value)}
+            placeholder={`例:\n・チームミーティングで○○について議論\n・○○さんからの相談対応\n・新しいツールの調査`}
+            rows={6}
+            className={`w-full px-4 py-3 rounded-lg border ${
+              darkMode
+                ? 'bg-gray-900 border-gray-700 text-white placeholder-gray-500'
+                : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400'
+            } focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none`}
+          />
+        )}
+
+        <p className={`text-xs ${textSecondary} mt-2`}>
+          💾 入力内容は自動的に保存されます
+        </p>
       </div>
 
       {/* 日報プレビュー */}

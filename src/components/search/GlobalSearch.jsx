@@ -24,7 +24,7 @@ export const GlobalSearch = ({
   const [showDropdown, setShowDropdown] = useState(false);
   const [searchHistory, setSearchHistory] = useState([]);
   const [savedSearches, setSavedSearches] = useState([]);
-  const [fuzzySearch, setFuzzySearch] = useState(false);
+  const [fuzzySearch, setFuzzySearch] = useState(true);
   const [includeCompleted, setIncludeCompleted] = useState(true);
 
   const searchRef = useRef(null);
@@ -133,25 +133,21 @@ export const GlobalSearch = ({
         </div>
 
         {/* オプション */}
-        <div className={`flex items-center gap-4 px-4 pb-3 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={fuzzySearch}
-              onChange={(e) => setFuzzySearch(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded"
-            />
-            <span className={`text-xs ${textSecondary}`}>あいまい検索</span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={includeCompleted}
-              onChange={(e) => setIncludeCompleted(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded"
-            />
-            <span className={`text-xs ${textSecondary}`}>完了済みを含む</span>
-          </label>
+        <div className={`flex items-center gap-2 px-4 pb-3 pt-2 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+          <button
+            onClick={() => setIncludeCompleted(!includeCompleted)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              includeCompleted
+                ? darkMode
+                  ? 'bg-green-600 text-white'
+                  : 'bg-green-500 text-white'
+                : darkMode
+                ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            {includeCompleted ? '✓ ' : ''}完了済みを含む
+          </button>
         </div>
       </div>
 
