@@ -15,9 +15,20 @@ const BUCKET_NAME = 'task-attachments';
 export const uploadFile = async (file, taskId) => {
   try {
     const timestamp = Date.now();
-    // ファイル名をURLエンコード（日本語対応）
-    const encodedFileName = encodeURIComponent(file.name);
-    const fileName = `${taskId}/${timestamp}_${encodedFileName}`;
+
+    // ファイル拡張子を取得
+    const fileExtension = file.name.includes('.')
+      ? file.name.split('.').pop()
+      : 'bin';
+
+    // ASCII安全なファイル名を生成（日本語文字を含まない）
+    const randomString = Math.random().toString(36).substring(2, 10);
+    const safeFileName = `${timestamp}_${randomString}.${fileExtension}`;
+    const fileName = `${taskId}/${safeFileName}`;
+
+    console.log('🔵 Original file name:', file.name);
+    console.log('🟢 Safe storage name:', safeFileName);
+    console.log('🟡 Full path:', fileName);
 
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
@@ -38,7 +49,8 @@ export const uploadFile = async (file, taskId) => {
     return {
       success: true,
       url: urlData.publicUrl,
-      path: fileName
+      path: fileName,
+      originalName: file.name  // 元のファイル名を保持
     };
   } catch (error) {
     console.error('ファイルアップロードエラー:', error);
