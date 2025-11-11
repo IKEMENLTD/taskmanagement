@@ -501,16 +501,50 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
           {reportData.completedRoutines.length > 0 ? (
             <div className="space-y-2">
               {reportData.completedRoutines.map((routine, index) => (
-                <div key={index} className={`${darkMode ? 'bg-gray-700' : 'bg-green-50'} rounded-lg p-3`}>
+                <div key={index} className={`${darkMode ? 'bg-gray-700' : 'bg-green-50'} rounded-lg p-4 border-l-4 border-green-500`}>
                   <div className="flex items-start justify-between">
-                    <div>
-                      <p className={`font-medium ${textColor}`}>{routine.name}</p>
-                      <p className={`text-sm ${textSecondary}`}>{routine.assignee} - {routine.time}</p>
-                      {routine.notes && (
-                        <p className={`text-sm ${textSecondary} mt-1`}>メモ: {routine.notes}</p>
-                      )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className={`font-semibold ${textColor}`}>{routine.name}</p>
+                        {routine.category && (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {routine.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className={`text-sm ${textSecondary} space-y-1`}>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <User size={14} />
+                            {routine.assignee}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock size={14} />
+                            {routine.time}
+                            {routine.duration && ` (${routine.duration}分)`}
+                          </span>
+                          {routine.repeat && (
+                            <span className="flex items-center gap-1">
+                              <Target size={14} />
+                              {routine.repeat === 'daily' ? '毎日' :
+                               routine.repeat === 'weekday' ? '平日' :
+                               routine.repeat === 'weekend' ? '週末' : 'カスタム'}
+                            </span>
+                          )}
+                        </div>
+                        {routine.description && (
+                          <p className={`${textSecondary} mt-2 text-sm italic`}>{routine.description}</p>
+                        )}
+                        {routine.notes && (
+                          <div className={`mt-2 p-2 rounded ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                            <p className={`text-sm ${textColor}`}>📝 {routine.notes}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <CheckCircle size={20} className="text-green-500" />
+                    <CheckCircle size={20} className="text-green-500 flex-shrink-0 ml-2" />
                   </div>
                 </div>
               ))}
@@ -526,12 +560,54 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
           {reportData.incompleteRoutines.length > 0 ? (
             <div className="space-y-2">
               {reportData.incompleteRoutines.map((routine, index) => (
-                <div key={index} className={`${darkMode ? 'bg-gray-700' : 'bg-yellow-50'} rounded-lg p-3`}>
+                <div key={index} className={`${darkMode ? 'bg-gray-700' : 'bg-yellow-50'} rounded-lg p-4 border-l-4 border-yellow-500`}>
                   <div className="flex items-start justify-between">
-                    <div>
-                      <p className={`font-medium ${textColor}`}>{routine.name}</p>
-                      <p className={`text-sm ${textSecondary}`}>{routine.assignee} - {routine.time}</p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className={`font-semibold ${textColor}`}>{routine.name}</p>
+                        {routine.category && (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            darkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-100 text-blue-700'
+                          }`}>
+                            {routine.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className={`text-sm ${textSecondary} space-y-1`}>
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <span className="flex items-center gap-1">
+                            <User size={14} />
+                            {routine.assignee}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock size={14} />
+                            {routine.time}
+                            {routine.duration && ` (${routine.duration}分)`}
+                          </span>
+                          {routine.repeat && (
+                            <span className="flex items-center gap-1">
+                              <Target size={14} />
+                              {routine.repeat === 'daily' ? '毎日' :
+                               routine.repeat === 'weekday' ? '平日' :
+                               routine.repeat === 'weekend' ? '週末' : 'カスタム'}
+                            </span>
+                          )}
+                        </div>
+                        {routine.description && (
+                          <p className={`${textSecondary} mt-2 text-sm italic`}>{routine.description}</p>
+                        )}
+                        {routine.notes && (
+                          <div className={`mt-2 p-2 rounded ${darkMode ? 'bg-gray-800' : 'bg-white'}`}>
+                            <p className={`text-sm ${textColor}`}>📝 {routine.notes}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium flex-shrink-0 ml-2 ${
+                      darkMode ? 'bg-yellow-900/30 text-yellow-300' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      未完了
+                    </span>
                   </div>
                 </div>
               ))}

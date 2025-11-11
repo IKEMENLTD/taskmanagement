@@ -12,6 +12,12 @@ import {
   getDependencyTasks,
   calculateRecommendedStartDate
 } from '../../utils/dependencyUtils';
+import {
+  uploadFile,
+  deleteFile,
+  downloadFile,
+  formatFileSize as formatFileSizeUtil
+} from '../../utils/fileStorageUtils';
 
 /**
  * タスク詳細モーダルコンポーネント
@@ -178,35 +184,72 @@ export const TaskDetailModal = ({
     fileInputRef.current?.click();
   };
 
+  // アップロード状態
+  const [isUploading, setIsUploading] = useState(false);
+
   // ファイルが選択されたときの処理
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const newAttachments = files.map(file => ({
-      id: Date.now() + Math.random(),
-      name: file.name,
-      size: formatFileSize(file.size),
-      type: file.type || 'application/octet-stream',
-      uploadDate: new Date().toLocaleDateString('ja-JP'),
-      uploadTime: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })
-    }));
+    setIsUploading(true);
 
-    const updatedTask = {
-      ...editedTask,
-      attachments: [...(editedTask.attachments || []), ...newAttachments]
-    };
+    try {
+      const newAttachments = [];
 
-    setEditedTask(updatedTask);
-    onUpdateTask(updatedTask);
+      for (const file of files) {
+        // Supabase Storageにアップロード
+        const result = await uploadFile(file, task.id);
 
-    // ファイル入力をリセット
-    e.target.value = '';
+        if (result.success) {
+          newAttachments.push({
+            id: Date.now() + Math.random(),
+            name: file.name,
+            size: formatFileSizeUtil(file.size),
+            type: file.type || 'application/octet-stream',
+            uploadDate: new Date().toLocaleDateString('ja-JP'),
+            uploadTime: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
+            url: result.url,
+            path: result.path
+          });
+        } else {
+          alert(`ファイル "${file.name}" のアップロードに失敗しました: ${result.error}`);
+        }
+      }
+
+      if (newAttachments.length > 0) {
+        const updatedTask = {
+          ...editedTask,
+          attachments: [...(editedTask.attachments || []), ...newAttachments]
+        };
+
+        setEditedTask(updatedTask);
+        onUpdateTask(updatedTask);
+      }
+    } catch (error) {
+      console.error('ファイルアップロードエラー:', error);
+      alert('ファイルのアップロードに失敗しました');
+    } finally {
+      setIsUploading(false);
+      // ファイル入力をリセット
+      e.target.value = '';
+    }
   };
 
   // ファイルを削除
-  const handleRemoveAttachment = (attachmentId) => {
+  const handleRemoveAttachment = async (attachmentId) => {
     if (!window.confirm('この添付ファイルを削除しますか？')) return;
+
+    const attachment = editedTask.attachments.find(att => att.id === attachmentId);
+
+    // Supabase Storageからも削除
+    if (attachment && attachment.path) {
+      const result = await deleteFile(attachment.path);
+      if (!result.success) {
+        console.error('ファイル削除エラー:', result.error);
+        // エラーでも続行（メタデータは削除）
+      }
+    }
 
     const updatedTask = {
       ...editedTask,
@@ -244,18 +287,6 @@ export const TaskDetailModal = ({
                 <span className={`px-3 py-1 rounded-full text-xs text-white ${getStatusColor(task.status)}`}>
                   {getStatusText(task.status)}
                 </span>
-                {task.priority && (
-                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                    task.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                    task.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
-                    task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                    'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                  }`}>
-                    {task.priority === 'urgent' ? '🔴 緊急' :
-                     task.priority === 'high' ? '🟠 高' :
-                     task.priority === 'medium' ? '🟡 中' : '🟢 低'}
-                  </span>
-                )}
               </div>
               <div className={`text-sm ${textSecondary} flex items-center gap-4 flex-wrap`}>
                 <span className="flex items-center gap-1">
@@ -670,9 +701,9 @@ export const TaskDetailModal = ({
               />
 
               {/* 注意書き */}
-              <div className={`${darkMode ? 'bg-yellow-900/20 border-yellow-700' : 'bg-yellow-50 border-yellow-200'} rounded-lg p-3 border text-sm`}>
-                <p className={darkMode ? 'text-yellow-300' : 'text-yellow-700'}>
-                  📎 注: ファイルのメタデータ（名前、サイズ、種類）のみが保存されます。実際のファイル保存にはバックエンドサーバーが必要です。
+              <div className={`${darkMode ? 'bg-blue-900/20 border-blue-700' : 'bg-blue-50 border-blue-200'} rounded-lg p-3 border text-sm`}>
+                <p className={darkMode ? 'text-blue-300' : 'text-blue-700'}>
+                  📎 ファイルはSupabase Storageに安全に保存されます。ダウンロード・削除が可能です。
                 </p>
               </div>
 
@@ -707,6 +738,13 @@ export const TaskDetailModal = ({
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => downloadFile(file.url, file.name)}
+                          className={`${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} p-2 transition-colors`}
+                          title="ダウンロード"
+                        >
+                          <Download size={16} />
+                        </button>
                         <button
                           onClick={() => handleRemoveAttachment(file.id)}
                           className={`${darkMode ? 'text-red-400 hover:text-red-300' : 'text-red-600 hover:text-red-700'} p-2 transition-colors`}
@@ -1025,43 +1063,63 @@ export const TaskDetailModal = ({
         </div>
 
         {/* フッター */}
-        <div className={`p-6 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
-          <div className="flex gap-2">
-            {!isEditing && (
-              <button
-                onClick={handleDelete}
-                className={`${darkMode ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'} text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm`}
-              >
-                <Trash2 size={16} />
-                削除
-              </button>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {isEditing ? (
-              <>
+        <div className={`p-6 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex flex-col gap-4`}>
+          {/* 優先度表示 */}
+          {task.priority && (
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-medium ${textSecondary}`}>優先度:</span>
+              <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+                task.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                task.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
+                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+              }`}>
+                {task.priority === 'urgent' ? '🔴 緊急' :
+                 task.priority === 'high' ? '🟠 高' :
+                 task.priority === 'medium' ? '🟡 中' : '🟢 低'}
+              </span>
+            </div>
+          )}
+
+          {/* ボタン */}
+          <div className="flex justify-between items-center">
+            <div className="flex gap-2">
+              {!isEditing && (
                 <button
-                  onClick={handleCancelEdit}
+                  onClick={handleDelete}
+                  className={`${darkMode ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'} text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm`}
+                >
+                  <Trash2 size={16} />
+                  削除
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {isEditing ? (
+                <>
+                  <button
+                    onClick={handleCancelEdit}
+                    className={`px-6 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${textColor} py-2 rounded-lg transition-colors font-medium`}
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    className={`${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white px-6 py-2 rounded-lg transition-colors font-medium flex items-center gap-2`}
+                  >
+                    <CheckCircle size={16} />
+                    変更を保存
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={onClose}
                   className={`px-6 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${textColor} py-2 rounded-lg transition-colors font-medium`}
                 >
-                  キャンセル
+                  閉じる
                 </button>
-                <button
-                  onClick={handleSave}
-                  className={`${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white px-6 py-2 rounded-lg transition-colors font-medium flex items-center gap-2`}
-                >
-                  <CheckCircle size={16} />
-                  変更を保存
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={onClose}
-                className={`px-6 ${darkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300'} ${textColor} py-2 rounded-lg transition-colors font-medium`}
-              >
-                閉じる
-              </button>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
