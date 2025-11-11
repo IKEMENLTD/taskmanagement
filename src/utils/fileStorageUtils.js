@@ -15,7 +15,9 @@ const BUCKET_NAME = 'task-attachments';
 export const uploadFile = async (file, taskId) => {
   try {
     const timestamp = Date.now();
-    const fileName = `${taskId}/${timestamp}_${file.name}`;
+    // ファイル名をURLエンコード（日本語対応）
+    const encodedFileName = encodeURIComponent(file.name);
+    const fileName = `${taskId}/${timestamp}_${encodedFileName}`;
 
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
