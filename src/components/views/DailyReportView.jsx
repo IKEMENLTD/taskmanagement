@@ -251,10 +251,53 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
       });
     }
 
-    // ルーティン達成率
+    // ルーティン詳細
     const emoji = memberRoutineRate >= 80 ? '🎉' : memberRoutineRate >= 50 ? '👍' : '💪';
     section += `\n${emoji} ルーティン達成率: ${memberRoutineRate}%`;
     section += ` (${memberCompletedRoutines.length}/${memberRoutineTotal}件)\n`;
+
+    // 完了したルーティン
+    if (memberCompletedRoutines.length > 0) {
+      section += `  ✅ 完了:\n`;
+      memberCompletedRoutines.forEach(routine => {
+        section += `    ${routine.name}`;
+        if (routine.category) {
+          section += ` [${routine.category}]`;
+        }
+        if (routine.time) {
+          section += ` ${routine.time}`;
+        }
+        if (routine.duration) {
+          section += ` (${routine.duration}分)`;
+        }
+        if (routine.completed_at) {
+          const completedTime = new Date(routine.completed_at);
+          section += ` ✓${String(completedTime.getHours()).padStart(2, '0')}:${String(completedTime.getMinutes()).padStart(2, '0')}`;
+        }
+        section += `\n`;
+      });
+    }
+
+    // 未完了のルーティン
+    if (memberIncompleteRoutines.length > 0) {
+      section += `  ⚠️ 未完了:\n`;
+      memberIncompleteRoutines.forEach(routine => {
+        section += `    ${routine.name}`;
+        if (routine.category) {
+          section += ` [${routine.category}]`;
+        }
+        if (routine.time) {
+          section += ` ${routine.time}`;
+        }
+        if (routine.duration) {
+          section += ` (${routine.duration}分)`;
+        }
+        if (routine.skip_reason) {
+          section += ` ※${routine.skip_reason}`;
+        }
+        section += `\n`;
+      });
+    }
 
     // サマリー
     const activeNonBlocked = memberActiveTasks.filter(t => t.status !== 'blocked');
