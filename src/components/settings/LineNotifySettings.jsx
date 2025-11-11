@@ -280,7 +280,7 @@ export const LineNotifySettings = ({
         lastSentDate: now.toISOString().split('T')[0],
         lastSentDateTime: dateTimeString
       };
-      saveLineSettings(user.organizationId, updatedSettings);
+      saveLineSettings(organizationId, updatedSettings);
       setSettings(updatedSettings);
     } else {
       setMessage({ type: 'error', text: `日報送信に失敗しました: ${result.error}` });

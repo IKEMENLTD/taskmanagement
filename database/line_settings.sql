@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS public.line_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL,
 
   -- LINE API設定
   enabled BOOLEAN DEFAULT false,
