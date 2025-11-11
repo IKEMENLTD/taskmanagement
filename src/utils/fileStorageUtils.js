@@ -88,17 +88,39 @@ export const deleteFile = async (filePath) => {
 
 /**
  * ファイルをダウンロード
- * @param {string} url - ファイルURL
- * @param {string} fileName - ファイル名
+ * @param {string} filePath - Supabase Storageのファイルパス
+ * @param {string} fileName - ダウンロード時のファイル名
  */
-export const downloadFile = (url, fileName) => {
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = fileName;
-  link.target = '_blank';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+export const downloadFile = async (filePath, fileName) => {
+  try {
+    // Supabase StorageのdownloadメソッドでBlobを取得
+    const { data, error } = await supabase.storage
+      .from(BUCKET_NAME)
+      .download(filePath);
+
+    if (error) {
+      throw error;
+    }
+
+    // BlobからURLを作成
+    const blobUrl = window.URL.createObjectURL(data);
+
+    // ダウンロードリンクを作成してクリック
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+
+    // クリーンアップ
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+
+    console.log('✅ ファイルダウンロード成功:', fileName);
+  } catch (error) {
+    console.error('ファイルダウンロードエラー:', error);
+    alert('ファイルのダウンロードに失敗しました: ' + error.message);
+  }
 };
 
 /**

@@ -739,7 +739,7 @@ export const TaskDetailModal = ({
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => downloadFile(file.url, file.name)}
+                          onClick={async () => await downloadFile(file.path, file.name)}
                           className={`${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-700'} p-2 transition-colors`}
                           title="ダウンロード"
                         >
