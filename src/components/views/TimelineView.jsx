@@ -735,24 +735,8 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                     >
                       {task.name}
                     </button>
-                    {/* 優先度バッジ */}
-                    {task.priority && (
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        task.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                        task.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
-                        task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                        'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                      }`}>
-                        {task.priority === 'urgent' ? '🔴' :
-                         task.priority === 'high' ? '🟠' :
-                         task.priority === 'medium' ? '🟡' : '🟢'}
-                        {task.priority === 'urgent' ? '緊急' :
-                         task.priority === 'high' ? '高' :
-                         task.priority === 'medium' ? '中' : '低'}
-                      </span>
-                    )}
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 mb-2">
                     {task.status === 'completed' && <CheckCircle size={14} className="text-green-500" />}
                     {task.status === 'blocked' && <AlertCircle size={14} className="text-red-500 animate-pulse" />}
                     <button
@@ -776,6 +760,24 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                       <Trash2 size={12} />
                     </button>
                   </div>
+                  {/* 優先度バッジ */}
+                  {task.priority && (
+                    <div className="mb-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        task.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                        task.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
+                        task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                        'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                      }`}>
+                        {task.priority === 'urgent' ? '🔴' :
+                         task.priority === 'high' ? '🟠' :
+                         task.priority === 'medium' ? '🟡' : '🟢'}
+                        {task.priority === 'urgent' ? '緊急' :
+                         task.priority === 'high' ? '高' :
+                         task.priority === 'medium' ? '中' : '低'}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div className={`text-xs ${textSecondary} mb-1`}>{task.assignee}</div>
                 <div className={`text-xs ${textSecondary} mb-2`}>
