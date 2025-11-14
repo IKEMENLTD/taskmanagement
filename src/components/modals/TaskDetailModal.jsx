@@ -115,6 +115,13 @@ export const TaskDetailModal = ({
       }
     }
 
+    // 進捗率バリデーション
+    const progress = parseInt(editedTask.progress);
+    if (isNaN(progress) || progress < 0 || progress > 100) {
+      alert('⚠️ 進捗率は0～100の範囲で入力してください。');
+      return;
+    }
+
     onUpdateTask(editedTask);
     setIsEditing(false);
   };
