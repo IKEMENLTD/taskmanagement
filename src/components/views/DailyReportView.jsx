@@ -375,6 +375,12 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
 
   // LINEに送信
   const handleSendLine = async () => {
+    // 既に送信中の場合は処理をスキップ（重複送信防止）
+    if (isSendingLine) {
+      console.log('[LINE送信] 送信処理が実行中のためスキップ');
+      return;
+    }
+
     if (!lineSettings.channelAccessToken || !lineSettings.groupId) {
       setLineMessage({ type: 'error', text: 'LINE設定が未設定です。設定画面から設定してください。' });
       setTimeout(() => setLineMessage({ type: '', text: '' }), 3000);

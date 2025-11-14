@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
  */
 export const useLineNotifyScheduler = (projects, routineTasks) => {
   const lastCheckRef = useRef(null);
+  const isSendingRef = useRef(false); // 送信中フラグを追加
   const { user } = useAuth();
 
   // プロジェクトまたはユーザーIDから組織IDを取得
@@ -35,6 +36,12 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
 
     // 設定を取得
     const checkAndSend = async () => {
+      // 既に送信処理が実行中の場合はスキップ（重複送信防止）
+      if (isSendingRef.current) {
+        console.log('[LINE通知] 送信処理が実行中のためスキップ');
+        return;
+      }
+
       const settings = await getLineSettings(organizationId);
 
       // 無効化されている場合はスキップ
@@ -68,6 +75,9 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
 
       console.log('[LINE通知] 日報を送信中...');
 
+      // 送信開始フラグを立てる
+      isSendingRef.current = true;
+
       try {
         // 日報を生成
         const report = generateTeamReport(
@@ -99,15 +109,17 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
         }
       } catch (error) {
         console.error('[LINE通知] ❌ エラーが発生しました:', error);
+      } finally {
+        // 送信処理完了後、フラグを解除
+        isSendingRef.current = false;
       }
     };
 
     // 1分ごとにチェック
     const interval = setInterval(checkAndSend, 60000);
 
-    // 初回チェック
-    console.log('[LINE通知] スケジューラー起動 - 1分ごとにチェックを開始');
-    checkAndSend();
+    // スケジューラー起動ログ（初回チェックは削除し、setIntervalのみで実行）
+    console.log('[LINE通知] スケジューラー起動 - 1分ごとにチェックを開始（初回は1分後）');
 
     return () => {
       console.log('[LINE通知] スケジューラー停止');
