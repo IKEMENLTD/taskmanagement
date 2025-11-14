@@ -419,10 +419,21 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
       }
     } catch (error) {
       console.error('LINE送信エラー:', error);
-      setLineMessage({ type: 'error', text: `送信エラー: ${error.message}` });
+
+      // エラーメッセージを詳細化
+      let errorMessage = '送信エラー: ';
+      if (error.message.includes('Authentication failed') || error.message.includes('access token')) {
+        errorMessage += 'アクセストークンが無効です。設定画面でLINEのチャンネルアクセストークンを確認してください。トークンが期限切れの場合は、LINE Developersコンソールで再発行してください。';
+      } else if (error.message.includes('Invalid reply token')) {
+        errorMessage += 'グループIDまたはユーザーIDが無効です。設定を確認してください。';
+      } else {
+        errorMessage += error.message;
+      }
+
+      setLineMessage({ type: 'error', text: errorMessage });
     } finally {
       setIsSendingLine(false);
-      setTimeout(() => setLineMessage({ type: '', text: '' }), 5000);
+      setTimeout(() => setLineMessage({ type: '', text: '' }), 8000); // エラー時は8秒表示
     }
   };
 

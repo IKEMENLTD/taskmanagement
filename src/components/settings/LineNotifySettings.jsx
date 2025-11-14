@@ -225,15 +225,24 @@ export const LineNotifySettings = ({
     if (result.success) {
       setMessage({ type: 'success', text: 'テスト送信に成功しました！LINEグループを確認してください。' });
     } else {
-      setMessage({ type: 'error', text: `テスト送信に失敗しました: ${result.error}` });
+      // エラーメッセージを詳細化
+      let errorMessage = 'テスト送信に失敗しました: ';
+      if (result.error && (result.error.includes('Authentication failed') || result.error.includes('access token'))) {
+        errorMessage += 'アクセストークンが無効です。LINE Developersコンソール (https://developers.line.biz/console/) でチャンネルアクセストークンを確認してください。トークンが期限切れの場合は再発行してください。';
+      } else if (result.error && result.error.includes('Invalid reply token')) {
+        errorMessage += 'グループIDまたはユーザーIDが無効です。LINEグループまたはトークルームのIDを正しく設定してください。';
+      } else {
+        errorMessage += result.error || '不明なエラー';
+      }
+      setMessage({ type: 'error', text: errorMessage });
     }
 
     setIsTesting(false);
 
-    // 5秒後にメッセージを消す
+    // エラー時は8秒、成功時は5秒でメッセージを消す
     setTimeout(() => {
       setMessage({ type: '', text: '' });
-    }, 5000);
+    }, result.success ? 5000 : 8000);
   };
 
   // 手動で日報送信

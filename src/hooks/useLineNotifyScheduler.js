@@ -105,10 +105,20 @@ export const useLineNotifyScheduler = (projects, routineTasks) => {
           await saveLineSettings(organizationId, updatedSettings);
           console.log(`[LINE通知] 最終送信日時を更新: ${dateTimeString}`);
         } else {
-          console.error('[LINE通知] ❌ 日報送信失敗:', result.error);
+          // エラー内容を詳細にログ出力
+          if (result.error && (result.error.includes('Authentication failed') || result.error.includes('access token'))) {
+            console.error('[LINE通知] ❌ アクセストークンが無効です。LINE設定を確認してください。', result.error);
+          } else {
+            console.error('[LINE通知] ❌ 日報送信失敗:', result.error);
+          }
         }
       } catch (error) {
-        console.error('[LINE通知] ❌ エラーが発生しました:', error);
+        // エラー内容を詳細にログ出力
+        if (error.message && (error.message.includes('Authentication failed') || error.message.includes('access token'))) {
+          console.error('[LINE通知] ❌ アクセストークンが無効です。LINE設定を確認してください。', error);
+        } else {
+          console.error('[LINE通知] ❌ エラーが発生しました:', error);
+        }
       } finally {
         // 送信処理完了後、フラグを解除
         isSendingRef.current = false;

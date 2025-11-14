@@ -12,10 +12,10 @@
 - **ホスティング**: Vercel
 
 ### 📊 最新コミット情報
-- **コミットハッシュ**: `ebcc980305f8f49e4c0ab59d6b915f232df71701`
-- **コミットメッセージ**: feat: タスクカードで進捗率100%を視覚的に強調表示
+- **コミットハッシュ**: `c2de8ff3ed9eefffe3c4962249c45ae5cc73153d`
+- **コミットメッセージ**: fix: 日報の重複送信を防止
 - **ブランチ**: main
-- **最終デプロイ日**: 2025年11月14日
+- **最終デプロイ日**: 2025年11月14日 15:49
 
 ---
 
@@ -64,12 +64,27 @@
 - `TaskDetailModal.jsx` (lines 118-125, 497-503)
 - `TimelineView.jsx` (lines 949-954, 1314-1319)
 
-### 3. バグ修正履歴
+### 3. 日報の重複送信防止
+日報が2回送信される問題を修正：
+
+#### 自動送信（useLineNotifyScheduler.js）
+- 送信中フラグ（`isSendingRef`）で同時実行を完全に防止
+- 初回チェックを削除し、setIntervalのみで1分ごとに実行
+- try-finally構文で確実なフラグ解除を保証
+- 関連ファイル: `src/hooks/useLineNotifyScheduler.js`
+
+#### 手動送信（DailyReportView.jsx）
+- 送信中チェックの早期リターンを追加
+- 重複クリック防止を強化
+- 関連ファイル: `src/components/views/DailyReportView.jsx` (lines 377-382)
+
+### 4. バグ修正履歴
 - ✅ 進捗率バリデーションの追加
 - ✅ 日付比較ロジックの確認（文字列形式YYYY-MM-DDで正常動作）
 - ✅ 検索機能の確認（最小文字数制限なし）
+- ✅ 日報の重複送信防止
 
-### 4. 過去に実装された機能
+### 5. 過去に実装された機能
 - ✅ メンバー別自由記述機能（日報）
 - ✅ 検索UI改善（あいまい検索デフォルト有効）
 - ✅ 日本語ファイル名のアップロード対応
@@ -172,6 +187,47 @@ className={`${task.progress === 100 ? 'bg-green-50 border-2 border-green-500' : 
 )}
 ```
 
+### 日報の重複送信防止（パターン）
+```javascript
+// 自動送信: 送信中フラグで同時実行を防止
+export const useLineNotifyScheduler = (projects, routineTasks) => {
+  const isSendingRef = useRef(false); // 送信中フラグ
+
+  const checkAndSend = async () => {
+    // 既に送信処理が実行中の場合はスキップ
+    if (isSendingRef.current) {
+      console.log('[LINE通知] 送信処理が実行中のためスキップ');
+      return;
+    }
+
+    // 送信開始フラグを立てる
+    isSendingRef.current = true;
+
+    try {
+      // 日報を生成して送信
+      const result = await sendLineMessage(...);
+    } catch (error) {
+      console.error('[LINE通知] エラー:', error);
+    } finally {
+      // 送信処理完了後、フラグを解除
+      isSendingRef.current = false;
+    }
+  };
+};
+
+// 手動送信: 送信中の早期リターン
+const handleSendLine = async () => {
+  if (isSendingLine) {
+    console.log('[LINE送信] 送信処理が実行中のためスキップ');
+    return;
+  }
+
+  setIsSendingLine(true);
+  // 送信処理...
+  setIsSendingLine(false);
+};
+```
+
 ### localStorage の使用状況
 ```javascript
 // 日報の自由記述（メンバー別）
@@ -259,10 +315,14 @@ VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ## 📦 バックアップ情報
 
 ### 最新バックアップ
-- **作成日時**: 2025年11月14日 14:02:26
+- **作成日時**: 2025年11月14日 15:49:51
 - **場所**: `C:\Users\kame\Desktop\taskmanagement_backups\`
+- **ファイル**: `taskmanagement_backup_20251114_154951.tar.gz` (195KB)
+- **情報ファイル**: `BACKUP_INFO_20251114_154951.txt`
+
+### 前回バックアップ
+- **作成日時**: 2025年11月14日 14:02:26
 - **ファイル**: `taskmanagement_backup_20251114_140226.tar.gz` (193KB)
-- **情報ファイル**: `BACKUP_INFO_20251114_140226.txt`
 
 ### バックアップに含まれる内容
 - 全ソースコード（src/, api/, database/, public/）
@@ -314,6 +374,10 @@ npm run dev
 
 5. ✅ 進捗率に100以上の値が入力可能
    - 解決策: リアルタイムクランプ処理を実装（0-100に制限）
+
+6. ✅ 日報が2回送信される（重複送信）
+   - 原因: 初回チェックの即時実行とsetIntervalの競合、React Strict Modeの影響
+   - 解決策: 送信中フラグ（isSendingRef）の追加、初回チェックの削除、try-finally構文による確実なフラグ解除
 
 ---
 
@@ -458,6 +522,26 @@ vercel --prod --yes
 
 ---
 
-**最終更新**: 2025年11月14日 14:02
+**最終更新**: 2025年11月14日 15:49
 **作成者**: Claude Code
 **セッション状態**: ✅ すべてのタスク完了、本番デプロイ済み、バックアップ作成済み
+
+## 📝 今回のセッションで実施した内容
+
+### 実施内容（2025年11月14日）
+1. **日報の重複送信問題を調査・修正**
+   - 原因特定: 初回チェックの即時実行とsetIntervalの競合
+   - 自動送信: 送信中フラグ（isSendingRef）の実装
+   - 手動送信: 重複クリック防止の強化
+
+2. **デプロイ**
+   - コミット: c2de8ff "fix: 日報の重複送信を防止"
+   - GitHub: プッシュ完了
+   - Vercel: 本番デプロイ完了
+
+3. **バックアップ作成**
+   - バックアップファイル: taskmanagement_backup_20251114_154951.tar.gz (195KB)
+   - 情報ファイル: BACKUP_INFO_20251114_154951.txt
+
+4. **ドキュメント更新**
+   - NEXT_SESSION_GUIDE.md を最新情報に更新
