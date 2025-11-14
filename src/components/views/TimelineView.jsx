@@ -713,7 +713,7 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
               <div
                 key={task.id}
                 {...getDraggableProps(task, handleTaskDrop)}
-                className={`p-3 rounded-lg ${task.status === 'completed' ? 'bg-green-50 dark:bg-green-900/20' :
+                className={`p-3 rounded-lg ${task.progress === 100 || task.status === 'completed' ? 'bg-green-50 dark:bg-green-900/20 border-2 border-green-500' :
                   task.status === 'blocked' ? 'bg-red-50 dark:bg-red-900/20' :
                     'bg-blue-50 dark:bg-blue-900/20'
                   } transition-all group cursor-move ${getDropZoneStyle(task, darkMode)} ${
@@ -736,7 +736,7 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                     <GripVertical size={14} className={`${textSecondary} flex-shrink-0 ${selectionMode ? 'hidden' : ''}`} />
                     <button
                       onClick={() => onTaskClick({ ...task, projectName: project.name, projectId: project.id })}
-                      className={`text-sm font-medium hover:underline text-left ${task.status === 'completed' ? 'text-green-700 dark:text-green-300' :
+                      className={`text-sm font-medium hover:underline text-left ${task.progress === 100 || task.status === 'completed' ? 'text-green-700 dark:text-green-300' :
                         task.status === 'blocked' ? 'text-red-700 dark:text-red-300' :
                           'text-blue-700 dark:text-blue-300'
                         }`}
@@ -745,7 +745,7 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                     </button>
                   </div>
                   <div className="flex items-center gap-1 mb-2">
-                    {task.status === 'completed' && <CheckCircle size={14} className="text-green-500" />}
+                    {(task.progress === 100 || task.status === 'completed') && <CheckCircle size={14} className="text-green-500" />}
                     {task.status === 'blocked' && <AlertCircle size={14} className="text-red-500 animate-pulse" />}
                     <button
                       onClick={(e) => {
@@ -823,12 +823,19 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                   return null;
                 })()}
 
-                <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-white'} rounded-full h-1.5`}>
+                <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-white'} rounded-full h-1.5 ${task.progress === 100 ? 'ring-1 ring-green-500' : ''}`}>
                   <div
-                    className={`h-1.5 rounded-full ${getStatusColor(task.status)} transition-all`}
+                    className={`h-1.5 rounded-full ${task.progress === 100 ? 'bg-green-500' : getStatusColor(task.status)} transition-all`}
                     style={{ width: `${task.progress}%` }}
                   ></div>
                 </div>
+                {/* 完了バッジ */}
+                {task.progress === 100 && task.status !== 'completed' && (
+                  <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-semibold mt-1">
+                    <CheckCircle size={12} />
+                    完了 (100%)
+                  </div>
+                )}
               </div>
             ))}
           </div>
