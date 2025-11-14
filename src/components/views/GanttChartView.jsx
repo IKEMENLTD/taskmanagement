@@ -277,8 +277,8 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                       ></div>
                       <div className="flex-1 overflow-hidden">
                         <div className="text-sm truncate">{project.name}</div>
-                        <div className={`text-xs ${textSecondary} truncate`}>
-                          {project.progress}%
+                        <div className={`text-xs ${project.progress === 100 ? 'text-green-600 dark:text-green-400 font-semibold' : textSecondary} truncate`}>
+                          {project.progress}% {project.progress === 100 && '✓'}
                         </div>
                       </div>
                     </div>
@@ -346,7 +346,11 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                               opacity: 0.8
                             }}
                           >
-                            {position.width > 10 && <span>{project.progress}%</span>}
+                            {position.width > 10 && (
+                              <span className={project.progress === 100 ? 'font-bold' : ''}>
+                                {project.progress}% {project.progress === 100 && '✓'}
+                              </span>
+                            )}
                           </div>
                         );
                       })()}
@@ -432,7 +436,9 @@ export const GanttChartView = ({ projects, onTaskClick, teamMembers, darkMode = 
                               >
                                 {(position.width > 15 || delayed) && (
                                   <>
-                                    <span className="text-xs">{task.progress}%</span>
+                                    <span className={`text-xs ${task.progress === 100 ? 'font-bold' : ''}`}>
+                                      {task.progress}% {task.progress === 100 && '✓'}
+                                    </span>
                                     {delayed && position.width > 15 && <span className="text-xs">⚠️</span>}
                                   </>
                                 )}

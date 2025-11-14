@@ -762,7 +762,10 @@ const Dashboard = () => {
                 {projects.slice(0, 3).map(project => (
                   <div key={project.id} className={`text-xs ${textSecondary} flex items-center justify-between`}>
                     <span>{project.name}</span>
-                    <span className="font-bold">{project.progress}%</span>
+                    <span className={`font-bold ${project.progress === 100 ? 'text-green-600 dark:text-green-400' : ''}`}>
+                      {project.progress}%
+                      {project.progress === 100 && ' ✓'}
+                    </span>
                   </div>
                 ))}
               </div>

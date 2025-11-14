@@ -115,12 +115,14 @@ export const TaskDetailModal = ({
       }
     }
 
-    // 進捗率バリデーション
-    const progress = parseInt(editedTask.progress);
-    if (isNaN(progress) || progress < 0 || progress > 100) {
-      alert('⚠️ 進捗率は0～100の範囲で入力してください。');
-      return;
-    }
+    // 進捗率バリデーション（念のため）
+    let progress = parseInt(editedTask.progress);
+    if (isNaN(progress)) progress = 0;
+    if (progress < 0) progress = 0;
+    if (progress > 100) progress = 100;
+
+    // クランプした値で更新
+    editedTask.progress = progress;
 
     onUpdateTask(editedTask);
     setIsEditing(false);
@@ -357,17 +359,30 @@ export const TaskDetailModal = ({
               <div>
                 <h3 className={`text-lg font-semibold ${textColor} mb-4`}>進捗状況</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
-                    <div className={`text-sm ${textSecondary} mb-1`}>完了率</div>
+                  <div className={`${task.progress === 100 ? (darkMode ? 'bg-green-900 border-2 border-green-500' : 'bg-green-50 border-2 border-green-500') : (darkMode ? 'bg-gray-700' : 'bg-gray-50')} rounded-lg p-4 transition-all`}>
+                    <div className={`text-sm ${task.progress === 100 ? 'text-green-600 dark:text-green-400 font-semibold' : textSecondary} mb-1 flex items-center gap-1`}>
+                      完了率
+                      {task.progress === 100 && (
+                        <CheckCircle size={16} className="text-green-600 dark:text-green-400" />
+                      )}
+                    </div>
                     <div className="flex items-end gap-2">
-                      <div className={`text-3xl font-bold ${textColor}`}>{task.progress}%</div>
+                      <div className={`text-3xl font-bold ${task.progress === 100 ? 'text-green-600 dark:text-green-400' : textColor}`}>
+                        {task.progress}%
+                      </div>
                       <div className={`w-full ${darkMode ? 'bg-gray-600' : 'bg-gray-300'} rounded-full h-2 mb-2`}>
                         <div
-                          className={`h-2 rounded-full ${getStatusColor(task.status)} transition-all`}
+                          className={`h-2 rounded-full ${task.progress === 100 ? 'bg-green-500' : getStatusColor(task.status)} transition-all`}
                           style={{ width: `${task.progress}%` }}
                         ></div>
                       </div>
                     </div>
+                    {task.progress === 100 && (
+                      <div className="mt-2 text-xs text-green-600 dark:text-green-400 font-semibold flex items-center gap-1">
+                        <CheckCircle size={14} />
+                        タスク完了！
+                      </div>
+                    )}
                   </div>
                   <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
                     <div className={`text-sm ${textSecondary} mb-1`}>作業時間</div>
@@ -494,7 +509,13 @@ export const TaskDetailModal = ({
                           min="0"
                           max="100"
                           value={editedTask.progress}
-                          onChange={(e) => setEditedTask({ ...editedTask, progress: parseInt(e.target.value) || 0 })}
+                          onChange={(e) => {
+                            let value = parseInt(e.target.value) || 0;
+                            // 0未満の場合は0に、100を超える場合は100にクランプ
+                            if (value < 0) value = 0;
+                            if (value > 100) value = 100;
+                            setEditedTask({ ...editedTask, progress: value });
+                          }}
                           className={`w-full px-3 py-2 rounded-lg border ${darkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                         />
                       </div>
