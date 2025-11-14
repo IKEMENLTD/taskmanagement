@@ -656,25 +656,33 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
               </div>
             </div>
             <div
-              className="px-3 py-1 rounded-full text-xs text-white"
-              style={{ backgroundColor: project.color || getStatusColor(project.status).replace('bg-', '#') }}
+              className={`px-3 py-1 rounded-full text-xs text-white font-semibold ${project.progress === 100 ? 'bg-green-500' : ''}`}
+              style={project.progress !== 100 ? { backgroundColor: project.color || getStatusColor(project.status).replace('bg-', '#') } : {}}
             >
-              {project.progress}%
+              {project.progress}% {project.progress === 100 && '✓'}
             </div>
           </div>
 
           {/* プロジェクト進捗バー */}
-          <div className="relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div className={`relative h-3 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden ${project.progress === 100 ? 'ring-2 ring-green-500' : ''}`}>
             <div
               className="absolute h-full transition-all duration-500"
               style={{
                 width: `${project.progress}%`,
-                backgroundColor: project.color || '#3b82f6'
+                backgroundColor: project.progress === 100 ? '#22c55e' : (project.color || '#3b82f6')
               }}
             >
               <div className="absolute inset-0 bg-white opacity-20 animate-pulse"></div>
             </div>
           </div>
+
+          {/* 完了バッジ */}
+          {project.progress === 100 && (
+            <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400 font-semibold mt-2">
+              <CheckCircle size={14} />
+              プロジェクト完了
+            </div>
+          )}
 
           {/* タスク追加ボタン */}
           <div className="mt-3 flex justify-end">
@@ -938,7 +946,12 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                         max="100"
                         placeholder="0-100"
                         value={formData.progress}
-                        onChange={(e) => setFormData({ ...formData, progress: parseInt(e.target.value) || 0 })}
+                        onChange={(e) => {
+                          let value = parseInt(e.target.value) || 0;
+                          if (value < 0) value = 0;
+                          if (value > 100) value = 100;
+                          setFormData({ ...formData, progress: value });
+                        }}
                         className={`w-full px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                       />
                     </div>
@@ -1085,9 +1098,19 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
             <div className="p-6 space-y-6">
               {/* 統計情報 */}
               <div className="grid grid-cols-3 gap-4">
-                <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
-                  <div className={`text-sm ${textSecondary} mb-1`}>進捗率</div>
-                  <div className={`text-3xl font-bold ${textColor}`}>{selectedProject.progress}%</div>
+                <div className={`${selectedProject.progress === 100 ? (darkMode ? 'bg-green-900 border-2 border-green-500' : 'bg-green-50 border-2 border-green-500') : (darkMode ? 'bg-gray-700' : 'bg-gray-50')} rounded-lg p-4`}>
+                  <div className={`text-sm ${selectedProject.progress === 100 ? 'text-green-600 dark:text-green-400 font-semibold' : textSecondary} mb-1 flex items-center gap-1`}>
+                    進捗率
+                    {selectedProject.progress === 100 && <CheckCircle size={14} className="text-green-600 dark:text-green-400" />}
+                  </div>
+                  <div className={`text-3xl font-bold ${selectedProject.progress === 100 ? 'text-green-600 dark:text-green-400' : textColor}`}>
+                    {selectedProject.progress}%
+                  </div>
+                  {selectedProject.progress === 100 && (
+                    <div className="mt-2 text-xs text-green-600 dark:text-green-400 font-semibold">
+                      完了！
+                    </div>
+                  )}
                 </div>
                 <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
                   <div className={`text-sm ${textSecondary} mb-1`}>タスク数</div>
@@ -1288,7 +1311,12 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
                       max="100"
                       placeholder="0-100"
                       value={taskFormData.progress}
-                      onChange={(e) => setTaskFormData({ ...taskFormData, progress: parseInt(e.target.value) || 0 })}
+                      onChange={(e) => {
+                        let value = parseInt(e.target.value) || 0;
+                        if (value < 0) value = 0;
+                        if (value > 100) value = 100;
+                        setTaskFormData({ ...taskFormData, progress: value });
+                      }}
                       className={`w-full px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                     />
                   </div>
