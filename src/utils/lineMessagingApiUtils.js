@@ -111,9 +111,16 @@ export const generateMemberReport = (member, projects, routineTasks, date) => {
 
     // 本日完了
     if (projectData.completed.length > 0) {
-      report += `  ✅ 本日完了: `;
-      report += projectData.completed.map(t => t.name).join(', ');
-      report += `\n`;
+      report += `  ✅ 本日完了:\n`;
+      projectData.completed.forEach(task => {
+        report += `    - ${task.name}`;
+        // 最新のコメントがあれば追加
+        if (task.comments && task.comments.length > 0) {
+          const latestComment = task.comments[task.comments.length - 1];
+          report += ` [コメント: ${latestComment.text}]`;
+        }
+        report += `\n`;
+      });
     }
 
     // 進行中
@@ -127,15 +134,27 @@ export const generateMemberReport = (member, projects, routineTasks, date) => {
         if (task.dueDate) {
           report += ` 期限:${task.dueDate}`;
         }
+        // 最新のコメントがあれば追加
+        if (task.comments && task.comments.length > 0) {
+          const latestComment = task.comments[task.comments.length - 1];
+          report += ` [コメント: ${latestComment.text}]`;
+        }
         report += `\n`;
       });
     }
 
     // ブロック中
     if (projectData.blocked.length > 0) {
-      report += `  ⚠️ ブロック中: `;
-      report += projectData.blocked.map(t => t.name).join(', ');
-      report += `\n`;
+      report += `  ⚠️ ブロック中:\n`;
+      projectData.blocked.forEach(task => {
+        report += `    - ${task.name}`;
+        // 最新のコメントがあれば追加
+        if (task.comments && task.comments.length > 0) {
+          const latestComment = task.comments[task.comments.length - 1];
+          report += ` [コメント: ${latestComment.text}]`;
+        }
+        report += `\n`;
+      });
     }
   });
 
@@ -251,10 +270,7 @@ export const saveLineSettings = async (organizationId, settings) => {
       throw new Error(`保存エラー: ${result.error.message} (code: ${result.error.code})`);
     }
 
-    // localStorage にもバックアップとして保存（オフライン時用）
-    localStorage.setItem('lineMessagingApiSettings', JSON.stringify(settings));
-
-    console.log('[saveLineSettings] 保存成功');
+    console.log('[saveLineSettings] 保存成功（Supabaseのみに保存）');
     return { success: true };
   } catch (error) {
     console.error('[saveLineSettings] エラー:', error);
@@ -288,12 +304,16 @@ export const getLineSettings = async (organizationId) => {
       };
     }
 
-    // データがない場合はlocalStorageから取得を試みる（マイグレーション用）
+    // データがない場合はlocalStorageから取得を試みる（マイグレーション用・初回のみ）
     const localSettings = localStorage.getItem('lineMessagingApiSettings');
     if (localSettings) {
+      console.log('[getLineSettings] localStorageからSupabaseへマイグレーション中...');
       const parsed = JSON.parse(localSettings);
       // localStorageからSupabaseに移行
       await saveLineSettings(organizationId, parsed);
+      // マイグレーション完了後、localStorageから削除
+      localStorage.removeItem('lineMessagingApiSettings');
+      console.log('[getLineSettings] マイグレーション完了、localStorageを削除しました');
       return parsed;
     }
 
@@ -309,16 +329,7 @@ export const getLineSettings = async (organizationId) => {
   } catch (error) {
     console.error('LINE設定の取得に失敗しました:', error);
 
-    // エラー時はlocalStorageから取得
-    try {
-      const localSettings = localStorage.getItem('lineMessagingApiSettings');
-      if (localSettings) {
-        return JSON.parse(localSettings);
-      }
-    } catch (e) {
-      console.error('localStorageからの取得も失敗:', e);
-    }
-
+    // デフォルト値を返す
     return {
       enabled: false,
       channelAccessToken: '',
