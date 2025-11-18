@@ -20,7 +20,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
  * Supabaseクライアント
  * データベース操作や認証に使用します
  */
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    }
+  }
+});
 
 /**
  * 接続テスト用関数
