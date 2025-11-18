@@ -227,10 +227,10 @@ export const saveLineSettings = async (organizationId, settings) => {
       .from('line_settings')
       .select('id')
       .eq('organization_id', organizationId)
-      .single();
+      .maybeSingle();
 
-    // PGRST116 = データが見つからない（正常）、それ以外はエラー
-    if (selectError && selectError.code !== 'PGRST116') {
+    // エラーがあればスロー（maybeSingleはデータが無い場合はnullを返す）
+    if (selectError) {
       console.error('[saveLineSettings] 既存設定の取得エラー:', selectError);
       throw new Error(`既存設定の取得に失敗: ${selectError.message} (code: ${selectError.code})`);
     }
@@ -287,9 +287,9 @@ export const getLineSettings = async (organizationId) => {
       .from('line_settings')
       .select('*')
       .eq('organization_id', organizationId)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = データが見つからない
+    if (error) {
       throw error;
     }
 

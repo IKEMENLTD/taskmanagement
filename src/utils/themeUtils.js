@@ -167,7 +167,7 @@ export const getUserTheme = async (userId) => {
       .from('user_settings')
       .select('theme')
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('テーマ取得エラー:', error);
