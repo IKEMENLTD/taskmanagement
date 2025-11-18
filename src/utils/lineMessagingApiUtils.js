@@ -19,6 +19,14 @@ export const sendLineMessage = async (channelAccessToken, groupId, message) => {
     throw new Error('Channel Access Token、Group ID、メッセージは必須です');
   }
 
+  // トークンの最初と最後の文字のみログに出力（セキュリティのため）
+  const tokenPreview = channelAccessToken.length > 20
+    ? `${channelAccessToken.substring(0, 10)}...${channelAccessToken.substring(channelAccessToken.length - 10)}`
+    : '***';
+  console.log('[sendLineMessage] トークン:', tokenPreview);
+  console.log('[sendLineMessage] グループID:', groupId);
+  console.log('[sendLineMessage] メッセージ長:', message.length);
+
   try {
     const response = await fetch(API_ENDPOINT, {
       method: 'POST',
@@ -35,9 +43,11 @@ export const sendLineMessage = async (channelAccessToken, groupId, message) => {
     const data = await response.json();
 
     if (!response.ok) {
+      console.error('[sendLineMessage] LINE APIエラーレスポンス:', data);
       throw new Error(data.error || 'LINE メッセージ送信に失敗しました');
     }
 
+    console.log('[sendLineMessage] 送信成功');
     return {
       success: true
     };
@@ -283,18 +293,23 @@ export const saveLineSettings = async (organizationId, settings) => {
  */
 export const getLineSettings = async (organizationId) => {
   try {
+    console.log('[getLineSettings] organizationId:', organizationId);
+
     const { data, error } = await supabase
       .from('line_settings')
       .select('*')
       .eq('organization_id', organizationId)
       .maybeSingle();
 
+    console.log('[getLineSettings] Supabaseからのレスポンス:', { data, error });
+
     if (error) {
+      console.error('[getLineSettings] エラー:', error);
       throw error;
     }
 
     if (data) {
-      return {
+      const settings = {
         enabled: data.enabled || false,
         channelAccessToken: data.channel_access_token || '',
         groupId: data.group_id || '',
@@ -302,7 +317,11 @@ export const getLineSettings = async (organizationId) => {
         selectedMembers: data.selected_members || [],
         lastSentDate: data.last_sent_date || null
       };
+      console.log('[getLineSettings] Supabaseから取得した設定:', settings);
+      return settings;
     }
+
+    console.log('[getLineSettings] Supabaseにデータが存在しません、localStorageを確認します');
 
     // データがない場合はlocalStorageから取得を試みる（マイグレーション用・初回のみ）
     const localSettings = localStorage.getItem('lineMessagingApiSettings');
