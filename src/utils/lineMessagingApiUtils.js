@@ -19,14 +19,6 @@ export const sendLineMessage = async (channelAccessToken, groupId, message) => {
     throw new Error('Channel Access Token、Group ID、メッセージは必須です');
   }
 
-  // トークンの最初と最後の文字のみログに出力（セキュリティのため）
-  const tokenPreview = channelAccessToken.length > 20
-    ? `${channelAccessToken.substring(0, 10)}...${channelAccessToken.substring(channelAccessToken.length - 10)}`
-    : '***';
-  console.log('[sendLineMessage] トークン:', tokenPreview);
-  console.log('[sendLineMessage] グループID:', groupId);
-  console.log('[sendLineMessage] メッセージ長:', message.length);
-
   try {
     const response = await fetch(API_ENDPOINT, {
       method: 'POST',
@@ -47,7 +39,6 @@ export const sendLineMessage = async (channelAccessToken, groupId, message) => {
       throw new Error(data.error || 'LINE メッセージ送信に失敗しました');
     }
 
-    console.log('[sendLineMessage] 送信成功');
     return {
       success: true
     };
@@ -225,10 +216,6 @@ export const generateTeamReport = (selectedMembers, projects, routineTasks, date
  */
 export const saveLineSettings = async (organizationId, settings) => {
   try {
-    // デバッグ情報
-    console.log('[saveLineSettings] organizationId:', organizationId);
-    console.log('[saveLineSettings] settings:', settings);
-
     if (!organizationId) {
       throw new Error('organizationIdが指定されていません。ユーザーが組織に所属していない可能性があります。');
     }
@@ -239,7 +226,6 @@ export const saveLineSettings = async (organizationId, settings) => {
       .eq('organization_id', organizationId)
       .maybeSingle();
 
-    // エラーがあればスロー（maybeSingleはデータが無い場合はnullを返す）
     if (selectError) {
       console.error('[saveLineSettings] 既存設定の取得エラー:', selectError);
       throw new Error(`既存設定の取得に失敗: ${selectError.message} (code: ${selectError.code})`);
@@ -255,32 +241,23 @@ export const saveLineSettings = async (organizationId, settings) => {
       last_sent_date: settings.lastSentDate || null
     };
 
-    console.log('[saveLineSettings] settingsData:', settingsData);
-
     let result;
     if (existingSettings) {
-      // 更新
-      console.log('[saveLineSettings] 既存設定を更新します');
       result = await supabase
         .from('line_settings')
         .update(settingsData)
         .eq('organization_id', organizationId);
     } else {
-      // 新規作成
-      console.log('[saveLineSettings] 新規設定を作成します');
       result = await supabase
         .from('line_settings')
         .insert([settingsData]);
     }
-
-    console.log('[saveLineSettings] result:', result);
 
     if (result.error) {
       console.error('[saveLineSettings] 保存エラー:', result.error);
       throw new Error(`保存エラー: ${result.error.message} (code: ${result.error.code})`);
     }
 
-    console.log('[saveLineSettings] 保存成功（Supabaseのみに保存）');
     return { success: true };
   } catch (error) {
     console.error('[saveLineSettings] エラー:', error);
@@ -293,15 +270,11 @@ export const saveLineSettings = async (organizationId, settings) => {
  */
 export const getLineSettings = async (organizationId) => {
   try {
-    console.log('[getLineSettings] organizationId:', organizationId);
-
     const { data, error } = await supabase
       .from('line_settings')
       .select('*')
       .eq('organization_id', organizationId)
       .maybeSingle();
-
-    console.log('[getLineSettings] Supabaseからのレスポンス:', { data, error });
 
     if (error) {
       console.error('[getLineSettings] エラー:', error);
@@ -309,7 +282,7 @@ export const getLineSettings = async (organizationId) => {
     }
 
     if (data) {
-      const settings = {
+      return {
         enabled: data.enabled || false,
         channelAccessToken: data.channel_access_token || '',
         groupId: data.group_id || '',
@@ -317,22 +290,16 @@ export const getLineSettings = async (organizationId) => {
         selectedMembers: data.selected_members || [],
         lastSentDate: data.last_sent_date || null
       };
-      console.log('[getLineSettings] Supabaseから取得した設定:', settings);
-      return settings;
     }
-
-    console.log('[getLineSettings] Supabaseにデータが存在しません、localStorageを確認します');
 
     // データがない場合はlocalStorageから取得を試みる（マイグレーション用・初回のみ）
     const localSettings = localStorage.getItem('lineMessagingApiSettings');
     if (localSettings) {
-      console.log('[getLineSettings] localStorageからSupabaseへマイグレーション中...');
       const parsed = JSON.parse(localSettings);
       // localStorageからSupabaseに移行
       await saveLineSettings(organizationId, parsed);
       // マイグレーション完了後、localStorageから削除
       localStorage.removeItem('lineMessagingApiSettings');
-      console.log('[getLineSettings] マイグレーション完了、localStorageを削除しました');
       return parsed;
     }
 

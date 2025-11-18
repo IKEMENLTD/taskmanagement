@@ -34,39 +34,13 @@ export default async function handler(req, res) {
   try {
     const { channelAccessToken, groupId, message } = req.body;
 
-    // デバッグログ
-    console.log('[send-line-message] リクエスト受信');
-    console.log('[send-line-message] トークン長:', channelAccessToken?.length);
-    console.log('[send-line-message] トークンプレビュー:', channelAccessToken?.substring(0, 20) + '...');
-    console.log('[send-line-message] グループID:', groupId);
-    console.log('[send-line-message] メッセージ長:', message?.length);
-
     // バリデーション
     if (!channelAccessToken || !groupId || !message) {
-      console.error('[send-line-message] バリデーションエラー:', {
-        hasToken: !!channelAccessToken,
-        hasGroupId: !!groupId,
-        hasMessage: !!message
-      });
       return res.status(400).json({
         success: false,
         error: 'channelAccessToken、groupId、messageは必須です'
       });
     }
-
-    // LINE Messaging APIへのリクエストボディを準備
-    const requestBody = {
-      to: groupId,
-      messages: [
-        {
-          type: 'text',
-          text: message
-        }
-      ]
-    };
-
-    console.log('[send-line-message] LINE APIへリクエスト送信');
-    console.log('[send-line-message] リクエストボディ:', JSON.stringify(requestBody));
 
     // LINE Messaging APIへリクエスト送信
     const lineResponse = await fetch('https://api.line.me/v2/bot/message/push', {
@@ -75,15 +49,21 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${channelAccessToken}`
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({
+        to: groupId,
+        messages: [
+          {
+            type: 'text',
+            text: message
+          }
+        ]
+      })
     });
-
-    console.log('[send-line-message] LINE APIレスポンスステータス:', lineResponse.status);
 
     // レスポンスチェック
     if (!lineResponse.ok) {
       const errorData = await lineResponse.json();
-      console.error('[send-line-message] LINE APIエラー詳細:', JSON.stringify(errorData, null, 2));
+      console.error('LINE API Error:', JSON.stringify(errorData, null, 2));
 
       return res.status(lineResponse.status).json({
         success: false,
@@ -91,8 +71,6 @@ export default async function handler(req, res) {
         details: errorData
       });
     }
-
-    console.log('[send-line-message] 送信成功');
 
     // 成功レスポンス
     return res.status(200).json({
