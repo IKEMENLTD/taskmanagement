@@ -5,14 +5,16 @@ import { supabase } from '../lib/supabase';
  */
 
 /**
- * 全ルーティンカテゴリーを取得
+ * 組織の全ルーティンカテゴリーを取得
+ * @param {string} organizationId - 組織ID
  * @returns {Promise<{data: Array, error: any}>}
  */
-export const getAllRoutineCategories = async () => {
+export const getAllRoutineCategories = async (organizationId) => {
   try {
     const { data, error } = await supabase
       .from('routine_categories')
       .select('*')
+      .eq('organization_id', organizationId)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -29,14 +31,16 @@ export const getAllRoutineCategories = async () => {
 
 /**
  * ルーティンカテゴリーを作成
+ * @param {string} organizationId - 組織ID
  * @param {Object} categoryData - カテゴリーデータ
  * @returns {Promise<{data: any, error: any}>}
  */
-export const createRoutineCategory = async (categoryData) => {
+export const createRoutineCategory = async (organizationId, categoryData) => {
   try {
     const { data, error } = await supabase
       .from('routine_categories')
       .insert([{
+        organization_id: organizationId,
         name: categoryData.name
       }])
       .select()

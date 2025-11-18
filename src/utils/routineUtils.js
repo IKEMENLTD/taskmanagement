@@ -5,16 +5,17 @@ import { supabase } from '../lib/supabase';
  */
 
 /**
- * 指定日のルーティンタスクを取得（チーム全体）
- * @param {string} userId - ユーザーID（互換性のために残すが使用しない）
+ * 指定日のルーティンタスクを取得（組織全体）
+ * @param {string} organizationId - 組織ID
  * @param {string} date - 日付 (YYYY-MM-DD)
  * @returns {Promise<{data: Array, error: any}>}
  */
-export const getRoutineTasks = async (userId, date) => {
+export const getRoutineTasks = async (organizationId, date) => {
   try {
     const { data, error } = await supabase
       .from('routine_tasks')
       .select('*')
+      .eq('organization_id', organizationId)
       .eq('date', date)
       .order('time', { ascending: true });
 
@@ -40,16 +41,17 @@ export const getRoutineTasks = async (userId, date) => {
 
 /**
  * ルーティンタスクを作成
- * @param {string} userId - ユーザーID
+ * @param {string} organizationId - 組織ID
  * @param {Object} routineData - ルーティンデータ
  * @returns {Promise<{data: any, error: any}>}
  */
-export const createRoutineTask = async (userId, routineData) => {
+export const createRoutineTask = async (organizationId, routineData) => {
   try {
     const { data, error } = await supabase
       .from('routine_tasks')
       .insert([{
-        user_id: userId,
+        organization_id: organizationId,
+        user_id: routineData.userId || null, // 後方互換性のため保持
         name: routineData.name,
         description: routineData.description || null,
         time: routineData.time,
@@ -173,11 +175,11 @@ export const resetRoutineTask = async (taskId) => {
 
 /**
  * 前日の未完了タスクを自動的にスキップする
- * @param {string} userId - ユーザーID
+ * @param {string} organizationId - 組織ID
  * @param {string} date - 前日の日付 (YYYY-MM-DD)
  * @returns {Promise<{data: any, error: any}>}
  */
-export const autoSkipPreviousDayTasks = async (userId, date) => {
+export const autoSkipPreviousDayTasks = async (organizationId, date) => {
   try {
     const { data, error } = await supabase
       .from('routine_tasks')
@@ -187,6 +189,7 @@ export const autoSkipPreviousDayTasks = async (userId, date) => {
         skip_reason: '日付変更により自動スキップ',
         updated_at: new Date().toISOString()
       })
+      .eq('organization_id', organizationId)
       .eq('date', date)
       .eq('status', 'pending')
       .select();
@@ -205,17 +208,18 @@ export const autoSkipPreviousDayTasks = async (userId, date) => {
 };
 
 /**
- * 指定期間のルーティンタスク統計を取得（チーム全体）
- * @param {string} userId - ユーザーID（互換性のために残すが使用しない）
+ * 指定期間のルーティンタスク統計を取得（組織全体）
+ * @param {string} organizationId - 組織ID
  * @param {string} startDate - 開始日 (YYYY-MM-DD)
  * @param {string} endDate - 終了日 (YYYY-MM-DD)
  * @returns {Promise<{data: Object, error: any}>}
  */
-export const getRoutineStats = async (userId, startDate, endDate) => {
+export const getRoutineStats = async (organizationId, startDate, endDate) => {
   try {
     const { data, error } = await supabase
       .from('routine_tasks')
       .select('status')
+      .eq('organization_id', organizationId)
       .gte('date', startDate)
       .lte('date', endDate);
 
