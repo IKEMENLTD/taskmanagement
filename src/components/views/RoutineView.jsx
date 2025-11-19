@@ -19,10 +19,9 @@ import {
 } from '../../utils/routineCategoryUtils';
 
 /**
- * ルーティンビューコンポーネント
- * @param {Array} routines - ルーティン一覧
- * @param {Object} teamStats - チーム統計データ
- * @param {number} completionRate - 達成率
+ * ルーティンビューコンポーネント（プロジェクトと同じパターン）
+ * @param {Array} routineTasks - ルーティンタスク配列（Supabaseから取得）
+ * @param {Function} setRoutineTasks - ルーティンタスク更新関数
  * @param {string} viewMode - 表示モード（メンバー名 | 'team'）
  * @param {Function} onViewModeChange - ビューモード切り替えハンドラー
  * @param {Function} onToggleRoutine - ルーティン切り替えハンドラー
@@ -30,18 +29,13 @@ import {
  * @param {Array} teamMembers - チームメンバー一覧
  * @param {Array} projects - プロジェクト一覧
  * @param {boolean} darkMode - ダークモードフラグ
- * @param {Function} onReorderRoutines - ルーティン並び替えハンドラー（オプション）
- * @param {Object} routineTasks - ルーティンタスク全体
- * @param {Function} setRoutineTasks - ルーティンタスク更新関数
  * @param {Date} currentTime - 現在時刻
  * @param {Array} routineCategories - カテゴリー一覧
  * @param {Function} setRoutineCategories - カテゴリー更新関数
- * @param {Function} getFilteredRoutines - フィルター済みルーティン取得関数
  */
 export const RoutineView = ({
-  routines,
-  teamStats,
-  completionRate,
+  routineTasks = [],
+  setRoutineTasks,
   viewMode,
   onViewModeChange,
   onToggleRoutine,
@@ -49,18 +43,23 @@ export const RoutineView = ({
   teamMembers,
   projects,
   darkMode = false,
-  onReorderRoutines,
-  routineTasks = {},
-  setRoutineTasks,
   currentTime = new Date(),
   routineCategories = [],
-  setRoutineCategories,
-  getFilteredRoutines
+  setRoutineCategories
 }) => {
-  const { user } = useAuth();
+  const { user, organizationId } = useAuth();
   const cardBg = darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
   const textColor = darkMode ? 'text-gray-100' : 'text-gray-900';
   const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-500';
+
+  // 今日のルーティンをフィルタリング（プロジェクトと同じパターン）
+  const todayDateString = useMemo(() => {
+    return currentTime.toISOString().split('T')[0];
+  }, [currentTime]);
+
+  const todayRoutines = useMemo(() => {
+    return routineTasks.filter(task => task.date === todayDateString);
+  }, [routineTasks, todayDateString]);
 
   // フィルター管理
   const [filterMember, setFilterMember] = useState('all');
@@ -93,6 +92,11 @@ export const RoutineView = ({
     const categoryName = newCategoryInput.trim();
     if (!categoryName) return;
 
+    if (!organizationId) {
+      alert('組織情報を取得中です。少々お待ちください。');
+      return;
+    }
+
     // 既に存在するか確認（オブジェクトの場合と文字列の場合の両方に対応）
     const exists = routineCategories.some(c =>
       typeof c === 'string' ? c === categoryName : c.name === categoryName
@@ -103,8 +107,8 @@ export const RoutineView = ({
       return;
     }
 
-    // Supabaseに保存
-    const { data, error } = await createRoutineCategory({
+    // Supabaseに保存（organizationIdを渡す）
+    const { data, error } = await createRoutineCategory(organizationId, {
       name: categoryName
     });
 
@@ -157,31 +161,32 @@ export const RoutineView = ({
   // ドラッグ&ドロップフック
   const { getDraggableProps, getDropZoneStyle, reorderItems } = useDragAndDrop();
 
-  // フィルター済みルーティンを取得
+  // フィルター済みルーティンを取得（プロジェクトと同じパターン）
   const filteredRoutines = useMemo(() => {
-    let result = routines;
+    let result = todayRoutines;
 
-    // 既存のフィルター処理
-    if (getFilteredRoutines) {
-      result = getFilteredRoutines(currentTime, {
-        member: viewMode === 'team' ? filterMember : viewMode,
-        project: filterProject
-      });
+    // メンバーフィルター
+    const targetMember = viewMode === 'team' ? filterMember : viewMode;
+    if (targetMember && targetMember !== 'all') {
+      result = result.filter(r => r.assignee === targetMember);
     }
 
-    // 曜日フィルタリングは削除：すべてのルーティンを表示し、RoutineCardでグレーアウト処理
+    // プロジェクトフィルター
+    if (filterProject && filterProject !== 'all') {
+      result = result.filter(r => r.projectId === parseInt(filterProject));
+    }
 
     return result;
-  }, [routines, currentTime, viewMode, filterMember, filterProject, getFilteredRoutines]);
+  }, [todayRoutines, viewMode, filterMember, filterProject]);
 
   // フィルター済みルーティンの統計を計算（今日実行されるルーティンのみ）
   const filteredStats = useMemo(() => {
     // 今日実行されるルーティンのみを対象に統計を計算
-    const todayRoutines = filteredRoutines.filter(r => shouldRoutineRunOnDate(r, currentTime));
+    const routinesForToday = filteredRoutines.filter(r => shouldRoutineRunOnDate(r, currentTime));
 
-    const completed = todayRoutines.filter(r => r.completed || r.status === 'completed').length;
-    const skipped = todayRoutines.filter(r => r.status === 'skipped').length;
-    const total = todayRoutines.length;
+    const completed = routinesForToday.filter(r => r.completed || r.status === 'completed').length;
+    const skipped = routinesForToday.filter(r => r.status === 'skipped').length;
+    const total = routinesForToday.length;
     const pending = total - completed - skipped;
 
     // スキップを除外した達成率
@@ -196,6 +201,32 @@ export const RoutineView = ({
       completionRate: rate
     };
   }, [filteredRoutines, currentTime]);
+
+  // チーム統計を計算
+  const teamStats = useMemo(() => {
+    const stats = {};
+
+    teamMembers.forEach(member => {
+      const memberRoutines = todayRoutines.filter(r => r.assignee === member.name);
+      const memberRoutinesForToday = memberRoutines.filter(r => shouldRoutineRunOnDate(r, currentTime));
+
+      const completed = memberRoutinesForToday.filter(r => r.completed || r.status === 'completed').length;
+      const skipped = memberRoutinesForToday.filter(r => r.status === 'skipped').length;
+      const total = memberRoutinesForToday.length;
+
+      const eligibleTasks = total - skipped;
+      const rate = eligibleTasks > 0 ? Math.round((completed / eligibleTasks) * 100) : 0;
+
+      stats[member.name] = {
+        completed,
+        skipped,
+        total,
+        rate
+      };
+    });
+
+    return stats;
+  }, [todayRoutines, teamMembers, currentTime]);
 
   // ローカル状態でルーティンを管理（ドラッグ中の並び替えを反映）
   const [localRoutines, setLocalRoutines] = useState(filteredRoutines);
@@ -291,16 +322,15 @@ export const RoutineView = ({
       return;
     }
 
-    if (!user?.id) {
-      alert('ログインが必要です。');
+    if (!user?.id || !organizationId) {
+      alert('ログインまたは組織情報が必要です。');
       return;
     }
 
     const today = getTodayDateString();
-    const todayRoutines = routineTasks[today] || [];
 
     if (editingRoutine) {
-      // 編集: Supabaseを更新
+      // 編集: Supabaseを更新（リアルタイム同期で自動的にstateが更新される）
       const { data, error } = await updateRoutineTask(editingRoutine.id, {
         name: formData.name.trim(),
         description: formData.description.trim(),
@@ -318,28 +348,9 @@ export const RoutineView = ({
         alert('ルーティンの更新に失敗しました。');
         return;
       }
-
-      // ローカル状態を更新
-      const updatedRoutines = todayRoutines.map(r =>
-        r.id === editingRoutine.id
-          ? {
-              ...r,
-              name: formData.name.trim(),
-              description: formData.description.trim(),
-              time: formData.time,
-              category: formData.category,
-              projectId: formData.projectId,
-              assignee: formData.assignee,
-              repeat: formData.repeat,
-              selectedDays: formData.selectedDays || [],
-              duration: formData.duration
-            }
-          : r
-      );
-      setRoutineTasks({ ...routineTasks, [today]: updatedRoutines });
     } else {
-      // 新規追加: Supabaseに保存
-      const { data, error } = await createRoutineTask(user.id, {
+      // 新規追加: Supabaseに保存（リアルタイム同期で自動的にstateが更新される）
+      const { data, error } = await createRoutineTask(organizationId, {
         name: formData.name.trim(),
         description: formData.description.trim(),
         time: formData.time,
@@ -357,29 +368,6 @@ export const RoutineView = ({
         alert('ルーティンの作成に失敗しました。');
         return;
       }
-
-      // ローカル状態を更新
-      const newRoutine = {
-        id: data.id,
-        name: data.name,
-        description: data.description || '',
-        time: data.time,
-        category: data.category,
-        projectId: data.project_id || null,
-        assignee: data.assignee,
-        repeat: data.repeat,
-        selectedDays: data.selectedDays || [],
-        duration: data.duration,
-        date: data.date,
-        status: data.status,
-        completed: false,
-        notes: '',
-        streak: 0,
-        completedDates: [],
-        created_at: data.created_at,
-        updated_at: data.updated_at
-      };
-      setRoutineTasks({ ...routineTasks, [today]: [...todayRoutines, newRoutine] });
     }
 
     closeModal();
@@ -388,7 +376,7 @@ export const RoutineView = ({
   const handleDelete = async (routineId) => {
     if (!window.confirm('このルーティンを削除しますか？')) return;
 
-    // Supabaseから削除
+    // Supabaseから削除（リアルタイム同期で自動的にstateが更新される）
     const { error } = await deleteRoutineTask(routineId);
 
     if (error) {
@@ -397,17 +385,12 @@ export const RoutineView = ({
       return;
     }
 
-    // ローカル状態を更新
-    const today = getTodayDateString();
-    const todayRoutines = routineTasks[today] || [];
-    const updatedRoutines = todayRoutines.filter(r => r.id !== routineId);
-    setRoutineTasks({ ...routineTasks, [today]: updatedRoutines });
     closeDetailModal();
   };
 
   // ルーティン更新
   const handleUpdateRoutine = async (updatedRoutine) => {
-    // Supabaseを更新
+    // Supabaseを更新（リアルタイム同期で自動的にstateが更新される）
     const { error } = await updateRoutineTask(updatedRoutine.id, {
       name: updatedRoutine.name,
       description: updatedRoutine.description,
@@ -425,14 +408,6 @@ export const RoutineView = ({
       alert('ルーティンの更新に失敗しました。');
       return;
     }
-
-    // ローカル状態を更新
-    const today = getTodayDateString();
-    const todayRoutines = routineTasks[today] || [];
-    const updatedRoutines = todayRoutines.map(r =>
-      r.id === updatedRoutine.id ? updatedRoutine : r
-    );
-    setRoutineTasks({ ...routineTasks, [today]: updatedRoutines });
   };
 
   // 日付と曜日を取得
@@ -581,7 +556,10 @@ export const RoutineView = ({
               <div
                 key={memberName}
                 className={`${cardBg} rounded-lg p-4 border hover:shadow-lg transition-all cursor-pointer`}
-                onClick={() => onFilterMemberChange(memberName)}
+                onClick={() => {
+                  onViewModeChange(memberName);
+                  setFilterMember('all');
+                }}
               >
                 <div className={`text-sm ${textSecondary} mb-1`}>{memberName}</div>
                 <div className={`text-2xl font-bold ${textColor} mb-2`}>{stats.rate}%</div>
@@ -655,7 +633,7 @@ export const RoutineView = ({
       )}
 
       {/* ルーティンが0件の場合 */}
-      {routines.length === 0 && (
+      {filteredRoutines.length === 0 && (
         <div className={`${cardBg} rounded-xl p-12 border text-center`}>
           <Clock size={48} className={`mx-auto mb-4 ${textSecondary}`} />
           <p className={`${textColor} text-lg font-semibold mb-2`}>

@@ -1,25 +1,38 @@
 -- ルーティン関連テーブルにorganization_id列を追加して組織ベースの共有を実現
 
--- 1. routine_tasksテーブルにorganization_id列を追加
-ALTER TABLE routine_tasks
-ADD COLUMN organization_id UUID REFERENCES organizations(id);
+-- 1. routine_tasksテーブルにorganization_id列を追加（存在しない場合のみ）
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'routine_tasks' AND column_name = 'organization_id'
+    ) THEN
+        ALTER TABLE routine_tasks ADD COLUMN organization_id UUID REFERENCES organizations(id);
+    END IF;
+END $$;
 
--- 2. routine_categoriesテーブルにorganization_id列を追加
-ALTER TABLE routine_categories
-ADD COLUMN organization_id UUID REFERENCES organizations(id);
+-- 2. routine_categoriesテーブルにorganization_id列を追加（存在しない場合のみ）
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'routine_categories' AND column_name = 'organization_id'
+    ) THEN
+        ALTER TABLE routine_categories ADD COLUMN organization_id UUID REFERENCES organizations(id);
+    END IF;
+END $$;
 
 -- 3. 既存のroutine_tasksデータにorganization_idを設定
--- user_idから対応するorganization_idを取得して設定
-UPDATE routine_tasks rt
-SET organization_id = u.id
-FROM users u
-WHERE rt.user_id = u.id;
+-- 全てのNULLデータを最初の組織に設定（シンプルなアプローチ）
+UPDATE routine_tasks
+SET organization_id = (SELECT id FROM organizations ORDER BY created_at LIMIT 1)
+WHERE organization_id IS NULL;
 
 -- 4. 既存のroutine_categoriesデータのorganization_idを設定
--- 最初のユーザーのorganization_idを使用（カテゴリはグローバルな可能性があるため）
-UPDATE routine_categories rc
-SET organization_id = (SELECT id FROM users LIMIT 1)
-WHERE rc.organization_id IS NULL;
+-- 全てのNULLデータを最初の組織に設定
+UPDATE routine_categories
+SET organization_id = (SELECT id FROM organizations ORDER BY created_at LIMIT 1)
+WHERE organization_id IS NULL;
 
 -- 5. インデックスを追加（パフォーマンス向上）
 CREATE INDEX IF NOT EXISTS idx_routine_tasks_organization_id ON routine_tasks(organization_id);

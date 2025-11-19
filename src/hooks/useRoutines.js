@@ -1,13 +1,13 @@
-import { useLocalStorage } from './useLocalStorage';
+import { useState } from 'react';
 
 /**
- * ルーティンタスク管理用カスタムフック（LocalStorage対応）
+ * ルーティンタスク管理用カスタムフック（Supabase対応）
  * @param {Object} initialRoutines - 初期ルーティンデータ
  * @returns {Object} ルーティン管理用の関数とデータ
  */
 export const useRoutines = (initialRoutines = {}) => {
-  // LocalStorageを使用してデータを永続化
-  const [routineTasks, setRoutineTasks] = useLocalStorage('routineTasks', initialRoutines);
+  // useStateを使用（Supabaseから取得したデータを保持）
+  const [routineTasks, setRoutineTasks] = useState(initialRoutines);
 
   /**
    * 今日のルーティンを取得

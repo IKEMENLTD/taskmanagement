@@ -4,8 +4,6 @@ import { Moon, Sun, Menu, X, Settings, LogOut } from 'lucide-react';
 // データとユーティリティのインポート
 import { sampleProjects } from '../data/sampleProjects';
 import { sampleTeamMembers } from '../data/sampleTeam';
-import { sampleRoutines } from '../data/sampleRoutines';
-import { useRoutines } from '../hooks/useRoutines';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useNotifications } from '../hooks/useNotifications';
 import { defaultNotificationSettings } from '../utils/notificationUtils';
@@ -43,7 +41,7 @@ import { useLineNotifyScheduler } from '../hooks/useLineNotifyScheduler';
  */
 const Dashboard = () => {
   // 認証情報
-  const { user } = useAuth();
+  const { user, organizationId } = useAuth();
 
   // 時刻管理
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -71,6 +69,7 @@ const Dashboard = () => {
   const [projects, setProjects] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
   const [routineCategories, setRoutineCategories] = useState([]);
+  const [routineTasks, setRoutineTasks] = useState([]);  // プロジェクトと同じパターン
   const [isLoadingData, setIsLoadingData] = useState(true);
 
   // 通知設定（LocalStorage対応）
@@ -82,18 +81,6 @@ const Dashboard = () => {
   // キーボードショートカットヘルプ
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
 
-  // カスタムフックでルーティン管理
-  const {
-    routineTasks,
-    setRoutineTasks,
-    getTodayRoutines,
-    getRoutineCompletionRate,
-    toggleRoutineTask,
-    getFilteredRoutines,
-    getTeamRoutineStats,
-    reorderRoutines
-  } = useRoutines(sampleRoutines);
-
   // 時計の更新
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -102,11 +89,20 @@ const Dashboard = () => {
 
   // Supabaseからプロジェクト、チームメンバー、ルーティンカテゴリーを読み込む
   const loadData = useCallback(async () => {
+    // organizationIdが設定されるまで待つ
     if (!user) {
       setIsLoadingData(false);
       return;
     }
 
+    // organizationIdが未設定の場合は何もしない
+    if (!organizationId) {
+      console.log('⏳ 組織ID取得待ち... organizationId:', organizationId);
+      setIsLoadingData(false);
+      return;
+    }
+
+    console.log('✅ 組織IDで データ取得開始:', organizationId);
     setIsLoadingData(true);
 
     // プロジェクトを取得
@@ -126,7 +122,7 @@ const Dashboard = () => {
     }
 
     // ルーティンカテゴリーを取得
-    const { data: categoriesData, error: categoriesError } = await getAllRoutineCategories();
+    const { data: categoriesData, error: categoriesError } = await getAllRoutineCategories(organizationId);
     if (!categoriesError && categoriesData) {
       setRoutineCategories(categoriesData);
     } else if (categoriesError) {
@@ -135,7 +131,7 @@ const Dashboard = () => {
 
     // ルーティンタスクを取得
     const today = new Date().toISOString().split('T')[0];
-    const { data: routinesData, error: routinesError } = await getRoutineTasks(user.id, today);
+    const { data: routinesData, error: routinesError } = await getRoutineTasks(organizationId, today);
     if (!routinesError && routinesData) {
       const mappedData = routinesData.map(task => ({
         id: task.id,
@@ -143,18 +139,21 @@ const Dashboard = () => {
         description: task.description || '',
         time: task.time,
         category: task.category,
+        projectId: task.project_id || null,
         assignee: task.assignee,
         repeat: task.repeat,
         selectedDays: task.selectedDays || task.selected_days || [],
         completed: task.completed || false,
-        skipped: task.skipped || false,
-        date: task.date || today
+        status: task.status || 'pending',
+        date: task.date || today,
+        created_at: task.created_at,
+        updated_at: task.updated_at
       }));
-      setRoutineTasks({ [today]: mappedData });
+      setRoutineTasks(mappedData);  // プロジェクトと同じパターン：配列で保存
     }
 
     setIsLoadingData(false);
-  }, [user]);
+  }, [user, organizationId]);
 
   useEffect(() => {
     loadData();
@@ -213,9 +212,11 @@ const Dashboard = () => {
         console.log('ルーティンカテゴリー変更検知:', payload);
 
         // データを再取得
-        const { data, error } = await getAllRoutineCategories();
-        if (!error && data) {
-          setRoutineCategories(data);
+        if (organizationId) {
+          const { data, error } = await getAllRoutineCategories(organizationId);
+          if (!error && data) {
+            setRoutineCategories(data);
+          }
         }
       })
       .subscribe();
@@ -226,39 +227,30 @@ const Dashboard = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'routine_tasks' }, async (payload) => {
         console.log('ルーティンタスク変更検知:', payload);
 
-        // 今日のデータを再取得
-        const today = new Date().toISOString().split('T')[0];
-        const { data, error } = await getRoutineTasks(user.id, today);
+        // 今日のデータを再取得（プロジェクトと同じパターン）
+        if (organizationId) {
+          const today = new Date().toISOString().split('T')[0];
+          const { data, error } = await getRoutineTasks(organizationId, today);
 
-        if (!error && data) {
-          const mappedData = data.map(task => ({
-            id: task.id,
-            name: task.name,
-            description: task.description || '',
-            time: task.time,
-            category: task.category,
-            projectId: task.project_id || null,
-            assignee: task.assignee,
-            repeat: task.repeat,
-            selectedDays: task.selectedDays || task.selected_days || [],
-            duration: task.duration,
-            date: task.date,
-            status: task.status,
-            skip_reason: task.skip_reason || null,
-            completed: task.status === 'completed',
-            completed_at: task.completed_at,
-            skipped_at: task.skipped_at,
-            notes: '',
-            streak: 0,
-            completedDates: [],
-            created_at: task.created_at,
-            updated_at: task.updated_at
-          }));
-
-          setRoutineTasks(prev => ({
-            ...prev,
-            [today]: mappedData
-          }));
+          if (!error && data) {
+            const mappedData = data.map(task => ({
+              id: task.id,
+              name: task.name,
+              description: task.description || '',
+              time: task.time,
+              category: task.category,
+              projectId: task.project_id || null,
+              assignee: task.assignee,
+              repeat: task.repeat,
+              selectedDays: task.selectedDays || task.selected_days || [],
+              completed: task.completed || false,
+              status: task.status || 'pending',
+              date: task.date || today,
+              created_at: task.created_at,
+              updated_at: task.updated_at
+            }));
+            setRoutineTasks(mappedData);  // プロジェクトと同じパターン：配列で直接保存
+          }
         }
       })
       .subscribe();
@@ -271,7 +263,7 @@ const Dashboard = () => {
       categoriesSubscription.unsubscribe();
       routinesSubscription.unsubscribe();
     };
-  }, [user]);
+  }, [user, organizationId]);
 
   // 通知管理
   useNotifications(projects, routineTasks, currentTime, notificationSettings);
@@ -306,10 +298,15 @@ const Dashboard = () => {
   // Supabaseから今日のルーティンタスクを読み込む
   useEffect(() => {
     const loadRoutineTasks = async () => {
+      // organizationIdが設定されていない場合は何もしない
       if (!user?.id) return;
+      if (!organizationId) {
+        console.log('⏳ 組織ID取得待ち（ルーティンタスク）...');
+        return;
+      }
 
       const today = currentTime.toISOString().split('T')[0];
-      const { data, error } = await getRoutineTasks(user.id, today);
+      const { data, error } = await getRoutineTasks(organizationId, today);
 
       if (!error && data) {
         // Supabaseのデータをフロントエンドの形式にマッピング
@@ -337,15 +334,12 @@ const Dashboard = () => {
           updated_at: task.updated_at
         }));
 
-        setRoutineTasks(prev => ({
-          ...prev,
-          [today]: mappedData
-        }));
+        setRoutineTasks(mappedData);  // プロジェクトと同じパターン：配列で保存
       }
     };
 
     loadRoutineTasks();
-  }, [user?.id]); // currentTimeを削除（日付が変わった時は別のuseEffectで処理）
+  }, [user?.id, organizationId]); // currentTimeを削除（日付が変わった時は別のuseEffectで処理）
 
   // 日付変更時の自動スキップ処理
   useEffect(() => {
@@ -359,22 +353,21 @@ const Dashboard = () => {
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-      // ユーザーがログインしている場合のみ実行
-      if (user?.id) {
+      // ユーザーがログインしていて、organizationIdが設定されている場合のみ実行
+      if (user?.id && organizationId) {
         // 前日の未完了タスクを自動スキップ
-        autoSkipPreviousDayTasks(user.id, yesterdayStr).then(({ data, error }) => {
+        autoSkipPreviousDayTasks(organizationId, yesterdayStr).then(({ data, error }) => {
           if (!error && data && data.length > 0) {
             console.log(`前日(${yesterdayStr})の未完了タスク ${data.length}件 を自動スキップしました`);
 
-            // ローカルステートも更新
-            setRoutineTasks(prev => ({
-              ...prev,
-              [yesterdayStr]: (prev[yesterdayStr] || []).map(task =>
-                task.status === 'pending'
+            // ローカルステートも更新（配列形式）
+            setRoutineTasks(prev =>
+              prev.map(task =>
+                task.date === yesterdayStr && task.status === 'pending'
                   ? { ...task, status: 'skipped', skip_reason: '日付変更により自動スキップ' }
                   : task
               )
-            }));
+            );
           }
         });
       }
@@ -382,7 +375,7 @@ const Dashboard = () => {
 
     // 今日の日付を保存
     localStorage.setItem('lastCheckedDate', today);
-  }, [currentTime, user, setRoutineTasks]);
+  }, [currentTime, user, organizationId, setRoutineTasks]);
 
   // スタイル定義
   const bgColor = darkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50';
@@ -390,22 +383,32 @@ const Dashboard = () => {
   const textColor = darkMode ? 'text-gray-100' : 'text-gray-900';
   const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-500';
 
-  // 今日のルーティンデータ（useMemoで最適化）
-  const todayRoutines = useMemo(() => getTodayRoutines(currentTime), [currentTime, getTodayRoutines]);
-  const completionRate = useMemo(() => getRoutineCompletionRate(currentTime), [currentTime, getRoutineCompletionRate]);
-  const teamStats = useMemo(() => getTeamRoutineStats(currentTime, teamMembers), [currentTime, teamMembers, getTeamRoutineStats]);
+  // 今日のルーティンの達成率を計算
+  const completionRate = useMemo(() => {
+    const today = currentTime.toISOString().split('T')[0];
+    const todayRoutines = routineTasks.filter(r => r.date === today);
 
-  // ルーティン切り替えハンドラー（useCallbackで最適化）
+    if (todayRoutines.length === 0) return 0;
+
+    const completed = todayRoutines.filter(r => r.completed || r.status === 'completed').length;
+    const skipped = todayRoutines.filter(r => r.status === 'skipped').length;
+    const total = todayRoutines.length;
+
+    // スキップを除外した達成率
+    const eligibleTasks = total - skipped;
+    return eligibleTasks > 0 ? Math.round((completed / eligibleTasks) * 100) : 0;
+  }, [routineTasks, currentTime]);
+
+  // ルーティン切り替えハンドラー（プロジェクトと同じパターン）
   const handleToggleRoutine = useCallback(async (taskId) => {
     const today = currentTime.toISOString().split('T')[0];
-    const todayRoutines = routineTasks[today] || [];
-    const task = todayRoutines.find(t => t.id === taskId);
+    const task = routineTasks.find(t => t.id === taskId);
 
     if (!task) return;
 
     const newCompletedStatus = !(task.completed || task.status === 'completed');
 
-    // Supabaseを更新
+    // Supabaseを更新（リアルタイム同期で自動的にstateが更新される）
     if (newCompletedStatus) {
       const { error } = await completeRoutineTask(taskId);
       if (error) {
@@ -421,17 +424,14 @@ const Dashboard = () => {
         return;
       }
     }
+  }, [currentTime, routineTasks]);
 
-    // ローカル状態を更新
-    toggleRoutineTask(taskId, currentTime);
-  }, [toggleRoutineTask, currentTime, routineTasks]);
-
-  // ルーティンスキップハンドラー（useCallbackで最適化）
+  // ルーティンスキップハンドラー（プロジェクトと同じパターン）
   const handleSkipRoutine = useCallback(async (taskId) => {
     // スキップ理由を入力するプロンプトを表示（オプション）
     const reason = window.prompt('スキップ理由を入力してください（任意）:');
 
-    // Supabaseのスキップ関数を呼び出し
+    // Supabaseのスキップ関数を呼び出し（リアルタイム同期で自動的にstateが更新される）
     const { data, error } = await skipRoutineTask(taskId, reason);
 
     if (error) {
@@ -439,21 +439,7 @@ const Dashboard = () => {
       alert('スキップに失敗しました。もう一度お試しください。');
       return;
     }
-
-    // 成功したら、ローカルステートを更新
-    const today = currentTime.toISOString().split('T')[0];
-    setRoutineTasks(prev => ({
-      ...prev,
-      [today]: prev[today].map(task =>
-        task.id === taskId ? { ...task, status: 'skipped', skip_reason: reason } : task
-      )
-    }));
-  }, [currentTime, setRoutineTasks]);
-
-  // ルーティン並び替えハンドラー（useCallbackで最適化）
-  const handleReorderRoutines = useCallback((newRoutines) => {
-    reorderRoutines(newRoutines, currentTime);
-  }, [reorderRoutines, currentTime]);
+  }, []);
 
   // タスク更新ハンドラー（useCallbackで最適化）
   const handleUpdateTask = useCallback(async (updatedTask) => {
@@ -675,9 +661,8 @@ const Dashboard = () => {
 
             {selectedView === 'routine' && (
               <RoutineView
-                routines={todayRoutines}
-                teamStats={teamStats}
-                completionRate={completionRate}
+                routineTasks={routineTasks}
+                setRoutineTasks={setRoutineTasks}
                 viewMode={routineViewMode}
                 onViewModeChange={setRoutineViewMode}
                 onToggleRoutine={handleToggleRoutine}
@@ -685,13 +670,9 @@ const Dashboard = () => {
                 teamMembers={teamMembers}
                 projects={projects}
                 darkMode={darkMode}
-                onReorderRoutines={handleReorderRoutines}
-                routineTasks={routineTasks}
-                setRoutineTasks={setRoutineTasks}
                 currentTime={currentTime}
                 routineCategories={routineCategories}
                 setRoutineCategories={setRoutineCategories}
-                getFilteredRoutines={getFilteredRoutines}
               />
             )}
 
@@ -948,9 +929,8 @@ const Dashboard = () => {
             {selectedView === 'routine' && (
               <div id="routine-view">
                 <RoutineView
-                  routines={todayRoutines}
-                  teamStats={teamStats}
-                  completionRate={completionRate}
+                  routineTasks={routineTasks}
+                  setRoutineTasks={setRoutineTasks}
                   viewMode={routineViewMode}
                   onViewModeChange={setRoutineViewMode}
                   onToggleRoutine={handleToggleRoutine}
@@ -958,13 +938,9 @@ const Dashboard = () => {
                   teamMembers={teamMembers}
                   projects={projects}
                   darkMode={darkMode}
-                  onReorderRoutines={handleReorderRoutines}
-                  routineTasks={routineTasks}
-                  setRoutineTasks={setRoutineTasks}
                   currentTime={currentTime}
                   routineCategories={routineCategories}
                   setRoutineCategories={setRoutineCategories}
-                  getFilteredRoutines={getFilteredRoutines}
                 />
               </div>
             )}

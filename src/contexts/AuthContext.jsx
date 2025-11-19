@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChange, getCurrentUser } from '../utils/authUtils';
 import { getUserTheme, applyThemeColors } from '../utils/themeUtils';
+import { getUserOrganizationId } from '../utils/organizationUtils';
 
 /**
  * 認証コンテキスト
@@ -26,6 +27,7 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null);
   const [theme, setTheme] = useState('default');
   const [loading, setLoading] = useState(true);
+  const [organizationId, setOrganizationId] = useState(null);
 
   // ユーザーのテーマを取得して適用
   const fetchUserTheme = async (userId) => {
@@ -41,6 +43,19 @@ export const AuthProvider = ({ children }) => {
     console.log('🎨 ユーザーテーマ:', userTheme);
   };
 
+  // ユーザーの組織IDを取得
+  const fetchUserOrganization = async () => {
+    const { organizationId: orgId, error } = await getUserOrganizationId();
+    if (!error && orgId) {
+      setOrganizationId(orgId);
+      console.log('🏢 組織ID:', orgId);
+    } else {
+      console.error('⚠️ 組織ID取得失敗:', error);
+      // エラーの場合もnullを設定（undefinedを避ける）
+      setOrganizationId(null);
+    }
+  };
+
   // 初回読み込み時に認証状態を確認
   useEffect(() => {
     const initAuth = async () => {
@@ -51,6 +66,7 @@ export const AuthProvider = ({ children }) => {
       if (currentUser) {
         console.log('✅ ログイン済み:', currentUser.email);
         await fetchUserTheme(currentUser.id);
+        await fetchUserOrganization();
       } else {
         console.log('⚠️ 未ログイン');
       }
@@ -73,9 +89,10 @@ export const AuthProvider = ({ children }) => {
         setUser(newSession?.user || null);
         setSession(newSession);
 
-        // テーマを取得
+        // テーマと組織IDを取得
         if (newSession?.user) {
           await fetchUserTheme(newSession.user.id);
+          await fetchUserOrganization();
         }
       } else if (event === 'SIGNED_OUT') {
         console.log('👋 ログアウトしました');
@@ -83,6 +100,7 @@ export const AuthProvider = ({ children }) => {
         setSession(null);
         setTheme('default');
         applyThemeColors('default');
+        setOrganizationId(null);
       } else if (event === 'TOKEN_REFRESHED') {
         console.log('🔄 トークンを更新しました');
         setSession(newSession);
@@ -108,7 +126,8 @@ export const AuthProvider = ({ children }) => {
       applyThemeColors(newTheme);
     },
     loading,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
+    organizationId
   };
 
   return (
