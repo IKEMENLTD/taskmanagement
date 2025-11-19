@@ -2,11 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Calendar, Copy, Download, FileText, CheckCircle, Target, Clock, User, Send } from 'lucide-react';
 import { getLineSettings, generateMemberReport, generateTeamReport, sendLineMessage } from '../../utils/lineMessagingApiUtils';
 import { useAuth } from '../../contexts/AuthContext';
+import { getRoutineTasks } from '../../utils/routineUtils';
 
 /**
  * 日報ビューコンポーネント
  * @param {Array} projects - プロジェクト一覧
- * @param {Object} routineTasks - ルーティンタスク
+ * @param {Object} routineTasks - ルーティンタスク（今日のタスクのみ）
  * @param {Array} teamMembers - チームメンバー一覧
  * @param {boolean} darkMode - ダークモードフラグ
  */
@@ -16,17 +17,7 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
   const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-500';
 
   // 認証情報
-  const { user } = useAuth();
-
-  // プロジェクトまたはユーザーIDから組織IDを取得
-  const organizationId = useMemo(() => {
-    // プロジェクトから組織IDを取得
-    if (projects && projects.length > 0 && projects[0].organization_id) {
-      return projects[0].organization_id;
-    }
-    // プロジェクトがない、または組織IDがない場合はユーザーIDを使用
-    return user?.id || null;
-  }, [projects, user]);
+  const { user, organizationId } = useAuth();
 
   // 日付選択
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -34,6 +25,9 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
   const [showCopySuccess, setShowCopySuccess] = useState(false);
   const [isSendingLine, setIsSendingLine] = useState(false);
   const [lineMessage, setLineMessage] = useState({ type: '', text: '' });
+
+  // 選択された日付のルーティンタスク（Supabaseから取得）
+  const [dailyRoutineTasks, setDailyRoutineTasks] = useState([]);
 
   // 自由記述欄（メンバー別）
   const [memberNotes, setMemberNotes] = useState({});
@@ -59,6 +53,39 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
     loadLineSettings();
   }, [organizationId]);
 
+  // 選択された日付のルーティンタスクを読み込む
+  useEffect(() => {
+    const loadDailyRoutines = async () => {
+      if (!organizationId || !selectedDate) return;
+
+      const { data, error } = await getRoutineTasks(organizationId, selectedDate);
+      if (!error && data) {
+        // Dashboard.jsxと同じデータ変換を適用
+        const mappedData = data.map(task => ({
+          id: task.id,
+          name: task.name,
+          description: task.description || '',
+          time: task.time,
+          category: task.category,
+          projectId: task.project_id || null,
+          assignee: task.assignee,
+          repeat: task.repeat,
+          selectedDays: task.selectedDays || task.selected_days || [],
+          completed: task.completed || false,
+          status: task.status || 'pending',
+          date: task.date || selectedDate,
+          created_at: task.created_at,
+          updated_at: task.updated_at
+        }));
+        setDailyRoutineTasks(mappedData);
+      } else {
+        setDailyRoutineTasks([]);
+      }
+    };
+
+    loadDailyRoutines();
+  }, [organizationId, selectedDate]);
+
   // メンバーの記述を更新
   const updateMemberNote = (member, note) => {
     const key = `daily_report_notes_${selectedDate}_${member}`;
@@ -68,21 +95,22 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
 
   // 日報データを集計
   const reportData = useMemo(() => {
-    const dateStr = selectedDate;
+    // 選択された日付のルーティンタスクを使用
+    const dailyRoutines = dailyRoutineTasks;
 
-    // その日のルーティンタスクを取得
-    const dailyRoutines = routineTasks[dateStr] || [];
-
-    // 完了したルーティン
+    // 完了したルーティン（completedまたはstatus==='completed'）
     const completedRoutines = dailyRoutines.filter(r => {
-      if (selectedMember === 'all') return r.completed;
-      return r.completed && r.assignee === selectedMember;
+      const isCompleted = r.completed || r.status === 'completed';
+      if (selectedMember === 'all') return isCompleted;
+      return isCompleted && r.assignee === selectedMember;
     });
 
-    // 未完了のルーティン
+    // 未完了のルーティン（pendingまたは未完了）
     const incompleteRoutines = dailyRoutines.filter(r => {
-      if (selectedMember === 'all') return !r.completed;
-      return !r.completed && r.assignee === selectedMember;
+      const isCompleted = r.completed || r.status === 'completed';
+      const isSkipped = r.status === 'skipped';
+      if (selectedMember === 'all') return !isCompleted && !isSkipped;
+      return !isCompleted && !isSkipped && r.assignee === selectedMember;
     });
 
     // その日に更新されたタスクを取得
@@ -98,7 +126,7 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
           }
 
           // 完了日がその日のタスク
-          if (task.completedDate === dateStr || task.completed_date === dateStr) {
+          if (task.completedDate === selectedDate || task.completed_date === selectedDate) {
             completedTasks.push({
               ...task,
               projectName: project.name,
@@ -124,8 +152,48 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
       status: project.status,
       color: project.color,
       totalTasks: project.tasks?.length || 0,
-      completedTasks: project.tasks?.filter(t => t.status === 'completed').length || 0
+      completedTasks: project.tasks?.filter(t =>
+        t.status === 'completed' || t.progress === 100 || t.completed === true
+      ).length || 0
     }));
+
+    // タスク統計（全プロジェクトのタスクを集計）
+    let totalTasks = 0;
+    let completedTasksCount = 0;
+    let inProgressTasksCount = 0;
+    let blockedTasksCount = 0;
+
+    projects.forEach(project => {
+      if (project.tasks) {
+        project.tasks.forEach(task => {
+          // メンバーフィルター
+          if (selectedMember !== 'all' && task.assignee !== selectedMember) {
+            return;
+          }
+
+          totalTasks++;
+          // 完了判定: status === 'completed' または progress === 100 または completed === true
+          const isCompleted = task.status === 'completed' || task.progress === 100 || task.completed === true;
+
+          if (isCompleted) {
+            completedTasksCount++;
+          } else if (task.status === 'inProgress') {
+            inProgressTasksCount++;
+          } else if (task.status === 'blocked') {
+            blockedTasksCount++;
+          }
+        });
+      }
+    });
+
+    const taskStats = {
+      total: totalTasks,
+      completed: completedTasksCount,
+      inProgress: inProgressTasksCount,
+      blocked: blockedTasksCount,
+      pending: totalTasks - completedTasksCount - inProgressTasksCount - blockedTasksCount,
+      completionRate: totalTasks > 0 ? Math.round((completedTasksCount / totalTasks) * 100) : 0
+    };
 
     return {
       completedRoutines,
@@ -133,11 +201,12 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
       completedTasks,
       updatedTasks,
       projectProgress,
+      taskStats,
       routineCompletionRate: dailyRoutines.length > 0
         ? Math.round((completedRoutines.length / dailyRoutines.length) * 100)
         : 0
     };
-  }, [selectedDate, selectedMember, projects, routineTasks]);
+  }, [selectedDate, selectedMember, projects, dailyRoutineTasks]);
 
   // 日付変更時に全メンバーの記述をlocalStorageから読み込む
   useEffect(() => {
@@ -766,41 +835,50 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
           )}
         </div>
 
-        {/* 完了したタスク */}
+        {/* タスク統計 */}
         <div className={`${cardBg} rounded-xl p-6 border`}>
-          <h3 className={`text-lg font-bold ${textColor} mb-4`}>✨ 完了したタスク</h3>
-          {reportData.completedTasks.length > 0 ? (
-            <div className="space-y-2">
-              {reportData.completedTasks.map((task, index) => (
-                <div key={index} className={`${darkMode ? 'bg-gray-700' : 'bg-blue-50'} rounded-lg p-3 border-l-4`} style={{ borderLeftColor: task.projectColor }}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <p className={`font-medium ${textColor}`}>{task.name}</p>
-                    {task.priority && (
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        task.priority === 'urgent' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                        task.priority === 'high' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
-                        task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                        'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                      }`}>
-                        {task.priority === 'urgent' ? '🔴' :
-                         task.priority === 'high' ? '🟠' :
-                         task.priority === 'medium' ? '🟡' : '🟢'}
-                        {task.priority === 'urgent' ? '緊急' :
-                         task.priority === 'high' ? '高' :
-                         task.priority === 'medium' ? '中' : '低'}
-                      </span>
-                    )}
-                  </div>
-                  <p className={`text-sm ${textSecondary}`}>{task.projectName} - {task.assignee}</p>
-                  {task.description && (
-                    <p className={`text-sm ${textSecondary} mt-1`}>{task.description}</p>
-                  )}
-                </div>
-              ))}
+          <h3 className={`text-lg font-bold ${textColor} mb-4`}>📊 タスク統計</h3>
+          <div className="space-y-4">
+            {/* 達成率 */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className={`font-medium ${textColor}`}>全体達成率</p>
+                <p className={`text-2xl font-bold ${textColor}`}>{reportData.taskStats.completionRate}%</p>
+              </div>
+              <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full h-3`}>
+                <div
+                  className="bg-blue-500 h-3 rounded-full transition-all"
+                  style={{ width: `${reportData.taskStats.completionRate}%` }}
+                ></div>
+              </div>
             </div>
-          ) : (
-            <p className={textSecondary}>完了したタスクはありません</p>
-          )}
+
+            {/* 統計詳細 */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-3`}>
+                <p className={`text-xs ${textSecondary} mb-1`}>総タスク数</p>
+                <p className={`text-xl font-bold ${textColor}`}>{reportData.taskStats.total}</p>
+              </div>
+              <div className={`${darkMode ? 'bg-green-900/20' : 'bg-green-50'} rounded-lg p-3 border ${darkMode ? 'border-green-700' : 'border-green-200'}`}>
+                <p className={`text-xs ${darkMode ? 'text-green-300' : 'text-green-700'} mb-1`}>✅ 完了</p>
+                <p className={`text-xl font-bold ${darkMode ? 'text-green-300' : 'text-green-700'}`}>{reportData.taskStats.completed}</p>
+              </div>
+              <div className={`${darkMode ? 'bg-blue-900/20' : 'bg-blue-50'} rounded-lg p-3 border ${darkMode ? 'border-blue-700' : 'border-blue-200'}`}>
+                <p className={`text-xs ${darkMode ? 'text-blue-300' : 'text-blue-700'} mb-1`}>🔄 進行中</p>
+                <p className={`text-xl font-bold ${darkMode ? 'text-blue-300' : 'text-blue-700'}`}>{reportData.taskStats.inProgress}</p>
+              </div>
+              <div className={`${darkMode ? 'bg-yellow-900/20' : 'bg-yellow-50'} rounded-lg p-3 border ${darkMode ? 'border-yellow-700' : 'border-yellow-200'}`}>
+                <p className={`text-xs ${darkMode ? 'text-yellow-300' : 'text-yellow-700'} mb-1`}>⏸️ 保留</p>
+                <p className={`text-xl font-bold ${darkMode ? 'text-yellow-300' : 'text-yellow-700'}`}>{reportData.taskStats.pending}</p>
+              </div>
+              {reportData.taskStats.blocked > 0 && (
+                <div className={`${darkMode ? 'bg-red-900/20' : 'bg-red-50'} rounded-lg p-3 border ${darkMode ? 'border-red-700' : 'border-red-200'}`}>
+                  <p className={`text-xs ${darkMode ? 'text-red-300' : 'text-red-700'} mb-1`}>🚫 ブロック中</p>
+                  <p className={`text-xl font-bold ${darkMode ? 'text-red-300' : 'text-red-700'}`}>{reportData.taskStats.blocked}</p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* プロジェクト進捗 */}

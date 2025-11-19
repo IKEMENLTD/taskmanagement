@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TrendingUp, Calendar, Filter, Award, Target, CheckCircle, AlertCircle } from 'lucide-react';
 import {
   getDateRange,
@@ -12,7 +12,8 @@ import {
 } from '../../utils/statisticsUtils';
 import { SimpleBarChart } from '../charts/SimpleBarChart';
 import { SimplePieChart } from '../charts/SimplePieChart';
-import { SimpleLineChart } from '../charts/SimpleLineChart';
+import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 
 /**
  * 統計ダッシュボードコンポーネント
@@ -22,10 +23,16 @@ export const StatisticsView = ({ projects, routineTasks, teamMembers, darkMode =
   const textColor = darkMode ? 'text-gray-100' : 'text-gray-900';
   const textSecondary = darkMode ? 'text-gray-400' : 'text-gray-500';
 
+  // 認証情報
+  const { organizationId } = useAuth();
+
   // 期間フィルター
   const [period, setPeriod] = useState('week');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+
+  // 期間内のルーティンタスク（Supabaseから取得）
+  const [periodRoutineTasks, setPeriodRoutineTasks] = useState([]);
 
   // 期間範囲を取得
   const dateRange = useMemo(() => {
@@ -35,20 +42,65 @@ export const StatisticsView = ({ projects, routineTasks, teamMembers, darkMode =
     return getDateRange(period);
   }, [period, customStartDate, customEndDate]);
 
-  // 統計データを計算
+  // 期間内のルーティンタスクを取得
+  useEffect(() => {
+    const loadPeriodRoutines = async () => {
+      if (!organizationId || !dateRange.startDate || !dateRange.endDate) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('routine_tasks')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .gte('date', dateRange.startDate)
+          .lte('date', dateRange.endDate)
+          .order('date', { ascending: true });
+
+        if (!error && data) {
+          // Dashboard.jsxと同じデータ変換
+          const mappedData = data.map(task => ({
+            id: task.id,
+            name: task.name,
+            description: task.description || '',
+            time: task.time,
+            category: task.category,
+            projectId: task.project_id || null,
+            assignee: task.assignee,
+            repeat: task.repeat,
+            selectedDays: task.selectedDays || task.selected_days || [],
+            completed: task.completed || false,
+            status: task.status || 'pending',
+            date: task.date,
+            created_at: task.created_at,
+            updated_at: task.updated_at
+          }));
+          setPeriodRoutineTasks(mappedData);
+        } else {
+          setPeriodRoutineTasks([]);
+        }
+      } catch (err) {
+        console.error('ルーティンタスク取得エラー:', err);
+        setPeriodRoutineTasks([]);
+      }
+    };
+
+    loadPeriodRoutines();
+  }, [organizationId, dateRange]);
+
+  // 統計データを計算（期間内のルーティンタスクを使用）
   const stats = useMemo(() => {
-    return calculateOverallSummary(projects, routineTasks, dateRange.startDate, dateRange.endDate);
-  }, [projects, routineTasks, dateRange]);
+    return calculateOverallSummary(projects, periodRoutineTasks, dateRange.startDate, dateRange.endDate);
+  }, [projects, periodRoutineTasks, dateRange]);
 
   const projectStats = stats.projects;
   const taskStats = stats.tasks;
   const routineStats = stats.routines;
   const overallHealth = stats.overallHealth;
 
-  // チーム統計
+  // チーム統計（期間内のルーティンタスクを使用）
   const teamStats = useMemo(() => {
-    return calculateTeamStats(projects, routineTasks, teamMembers, dateRange.startDate, dateRange.endDate);
-  }, [projects, routineTasks, teamMembers, dateRange]);
+    return calculateTeamStats(projects, periodRoutineTasks, teamMembers, dateRange.startDate, dateRange.endDate);
+  }, [projects, periodRoutineTasks, teamMembers, dateRange]);
 
   // プロジェクト進捗分布
   const progressDistribution = useMemo(() => {
@@ -69,14 +121,6 @@ export const StatisticsView = ({ projects, routineTasks, teamMembers, darkMode =
       color: getPriorityColor(d.priority)
     }));
   }, [projects]);
-
-  // ルーティン達成率トレンド
-  const routineTrend = useMemo(() => {
-    return routineStats.dailyRates.map(d => ({
-      label: formatDate(d.date),
-      value: d.rate
-    }));
-  }, [routineStats]);
 
   // 健全性スコアの色
   const getHealthColor = (status) => {
@@ -246,14 +290,6 @@ export const StatisticsView = ({ projects, routineTasks, teamMembers, darkMode =
         </div>
       </div>
 
-      {/* ルーティン達成率トレンド */}
-      {routineTrend.length > 0 && (
-        <div className={`${cardBg} rounded-xl p-6 border`}>
-          <h3 className={`text-lg font-semibold ${textColor} mb-4`}>ルーティン達成率トレンド</h3>
-          <SimpleLineChart data={routineTrend} darkMode={darkMode} height={200} />
-        </div>
-      )}
-
       {/* チームメンバー統計 */}
       <div className={`${cardBg} rounded-xl p-6 border`}>
         <h3 className={`text-lg font-semibold ${textColor} mb-4`}>チームメンバー統計</h3>
@@ -319,14 +355,18 @@ export const StatisticsView = ({ projects, routineTasks, teamMembers, darkMode =
         <div className={`${cardBg} rounded-xl p-6 border`}>
           <h4 className={`font-semibold ${textColor} mb-4`}>ルーティンカテゴリ</h4>
           <div className="space-y-2">
-            {Object.entries(routineStats.byCategory).map(([category, data]) => (
-              <div key={category} className="flex justify-between">
-                <span className={textSecondary}>{getCategoryLabel(category)}</span>
-                <span className={`font-semibold ${textColor}`}>
-                  {data.completed}/{data.total}
-                </span>
-              </div>
-            ))}
+            {Object.keys(routineStats.byCategory).length > 0 ? (
+              Object.entries(routineStats.byCategory).map(([category, data]) => (
+                <div key={category} className="flex justify-between">
+                  <span className={textSecondary}>{getCategoryLabel(category)}</span>
+                  <span className={`font-semibold ${textColor}`}>
+                    {data.completed}/{data.total}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className={`text-sm ${textSecondary}`}>この期間にルーティンタスクがありません</p>
+            )}
           </div>
         </div>
       </div>
@@ -376,8 +416,10 @@ const getStatusLabel = (status) => {
 const getTaskStatusLabel = (status) => {
   switch (status) {
     case 'todo': return '未着手';
+    case 'pending': return '保留';
     case 'inProgress': return '進行中';
     case 'completed': return '完了';
+    case 'blocked': return 'ブロック中';
     default: return 'その他';
   }
 };
@@ -389,9 +431,4 @@ const getCategoryLabel = (category) => {
     case 'personal': return '個人';
     default: return 'その他';
   }
-};
-
-const formatDate = (dateStr) => {
-  const date = new Date(dateStr);
-  return `${date.getMonth() + 1}/${date.getDate()}`;
 };

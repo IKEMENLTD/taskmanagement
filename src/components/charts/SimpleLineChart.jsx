@@ -66,7 +66,7 @@ export const SimpleLineChart = ({ data, darkMode = false, height = 200 }) => {
             d={pathD}
             fill="none"
             stroke="#3b82f6"
-            strokeWidth="2"
+            strokeWidth="0.8"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -77,29 +77,6 @@ export const SimpleLineChart = ({ data, darkMode = false, height = 200 }) => {
             fill="#3b82f6"
             opacity="0.1"
           />
-
-          {/* ポイント */}
-          {points.map((point, index) => (
-            <g key={index}>
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r="1.5"
-                fill="#3b82f6"
-                className="hover:r-2 transition-all cursor-pointer"
-              />
-              {/* ツールチップ用の大きな透明円 */}
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r="3"
-                fill="transparent"
-                className="cursor-pointer"
-              >
-                <title>{`${point.label}: ${point.value}`}</title>
-              </circle>
-            </g>
-          ))}
         </svg>
 
         {/* Y軸ラベル */}

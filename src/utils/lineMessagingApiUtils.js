@@ -220,17 +220,6 @@ export const saveLineSettings = async (organizationId, settings) => {
       throw new Error('organizationIdが指定されていません。ユーザーが組織に所属していない可能性があります。');
     }
 
-    const { data: existingSettings, error: selectError } = await supabase
-      .from('line_settings')
-      .select('id')
-      .eq('organization_id', organizationId)
-      .maybeSingle();
-
-    if (selectError) {
-      console.error('[saveLineSettings] 既存設定の取得エラー:', selectError);
-      throw new Error(`既存設定の取得に失敗: ${selectError.message} (code: ${selectError.code})`);
-    }
-
     const settingsData = {
       organization_id: organizationId,
       enabled: settings.enabled || false,
@@ -241,21 +230,17 @@ export const saveLineSettings = async (organizationId, settings) => {
       last_sent_date: settings.lastSentDate || null
     };
 
-    let result;
-    if (existingSettings) {
-      result = await supabase
-        .from('line_settings')
-        .update(settingsData)
-        .eq('organization_id', organizationId);
-    } else {
-      result = await supabase
-        .from('line_settings')
-        .insert([settingsData]);
-    }
+    // upsertを使用（存在すれば更新、なければ挿入）
+    const { error } = await supabase
+      .from('line_settings')
+      .upsert(settingsData, {
+        onConflict: 'organization_id',
+        ignoreDuplicates: false
+      });
 
-    if (result.error) {
-      console.error('[saveLineSettings] 保存エラー:', result.error);
-      throw new Error(`保存エラー: ${result.error.message} (code: ${result.error.code})`);
+    if (error) {
+      console.error('[saveLineSettings] 保存エラー:', error);
+      throw new Error(`保存エラー: ${error.message} (code: ${error.code})`);
     }
 
     return { success: true };

@@ -270,7 +270,8 @@ export const RoutineDetailModal = ({
           {/* 最近の達成履歴 */}
           <div>
             <h3 className={`text-lg font-semibold ${textColor} mb-3`}>最近の達成履歴</h3>
-            {routine.completedDates.length === 0 ? (
+            {/* 修正: completedDatesがundefinedの場合のチェック */}
+            {(!routine.completedDates || routine.completedDates.length === 0) ? (
               <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-8 text-center`}>
                 <History className={`mx-auto mb-3 ${textSecondary}`} size={48} />
                 <p className={textSecondary}>まだ達成履歴がありません</p>

@@ -182,10 +182,14 @@ export const calculateRoutineStats = (routineTasks, startDate, endDate) => {
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const dateStr = d.toISOString().split('T')[0];
-    const dayRoutines = routineTasks[dateStr] || [];
+
+    // routineTasksが配列形式の場合に対応
+    const dayRoutines = Array.isArray(routineTasks)
+      ? routineTasks.filter(task => task.date === dateStr)
+      : (routineTasks[dateStr] || []);
 
     if (dayRoutines.length > 0) {
-      const completed = dayRoutines.filter(r => r.completed).length;
+      const completed = dayRoutines.filter(r => r.completed || r.status === 'completed').length;
       const total = dayRoutines.length;
 
       stats.total += total;
@@ -205,7 +209,7 @@ export const calculateRoutineStats = (routineTasks, startDate, endDate) => {
           stats.byCategory[category] = { total: 0, completed: 0 };
         }
         stats.byCategory[category].total++;
-        if (routine.completed) {
+        if (routine.completed || routine.status === 'completed') {
           stats.byCategory[category].completed++;
         }
       });
