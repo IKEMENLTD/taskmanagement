@@ -35,10 +35,10 @@
 - **ホスティング**: Vercel
 
 ### 📊 最新コミット情報
-- **コミットハッシュ**: `cb47f3e`
-- **コミットメッセージ**: improve: 日報にタスクのコメント追加 & LINE設定をSupabaseで完全共有化
+- **コミットハッシュ**: `f5cb5b4`
+- **コミットメッセージ**: ルーティン管理をorganizationIdベースに変更し、PC間共有を実現
 - **ブランチ**: main
-- **最終デプロイ日**: 2025年11月17日 14:20頃
+- **最終デプロイ日**: 2025年11月19日 11:30頃
 
 ---
 
@@ -472,10 +472,12 @@ taskmanagement/
 主要テーブル:
 - `projects` - プロジェクト情報
 - `tasks` - タスク情報（attachments カラム含む）
-- `routine_tasks` - ルーティンタスク
+- `routine_tasks` - ルーティンタスク（organization_id列追加済み、user_id NULL許可）
+- `routine_categories` - ルーティンカテゴリー（organization_id列追加済み）
 - `routine_completions` - ルーティン完了記録
 - `team_members` - チームメンバー
 - `line_settings` - LINE設定
+- `organizations` - 組織情報
 
 ---
 
@@ -833,6 +835,10 @@ npm run dev
    - 問題: localStorage にバックアップ保存していたため、各PC個別の設定が表示される
    - 解決策: localStorage バックアップ機能を削除、Supabase のみで管理し全デバイスで共有
 
+10. ✅ ルーティンがPC間で共有されない
+   - 問題: user.idベースで管理していたため、異なるPCで異なるルーティンが表示される
+   - 解決策: organizationIdベースに変更、プロジェクト・タスクと同じパターンで実装、localStorage削除
+
 ---
 
 ## 💡 今後の改善アイデア
@@ -976,11 +982,62 @@ vercel --prod --yes
 
 ---
 
-**最終更新**: 2025年11月17日 14:25
+**最終更新**: 2025年11月19日 11:35
 **作成者**: Claude Code
-**セッション状態**: ✅ すべてのタスク完了、本番デプロイ済み、バックアップ作成済み
+**セッション状態**: ✅ すべてのタスク完了、本番デプロイ済み、PC間共有テスト成功
 
 ## 📝 今回のセッションで実施した内容
+
+### 実施内容（2025年11月19日）
+1. **ルーティン管理をorganizationIdベースに変更**
+   - user.id管理からorganizationId管理に移行
+   - プロジェクト・タスクと同じパターンで実装
+   - 修正ファイル: `src/components/Dashboard.jsx`, `src/components/views/RoutineView.jsx`
+   - 新規ファイル: `src/utils/organizationUtils.js`
+
+2. **routineTasksのデータ構造を配列形式に統一**
+   - オブジェクト形式 `{ [date]: [...] }` から配列形式 `[...]` に変更
+   - プロジェクトと同じパターンに統一
+   - リアルタイム同期の実装
+   - 修正ファイル: `src/components/Dashboard.jsx`, `src/hooks/useRoutines.js`
+
+3. **localStorageを削除し、完全にSupabase管理に移行**
+   - useLocalStorage hook の使用を削除
+   - すべてのデータをSupabaseから取得
+   - 修正ファイル: `src/components/Dashboard.jsx`
+
+4. **completionRate計算ロジックの追加**
+   - useRoutines hook削除に伴い、Dashboard.jsxで計算
+   - スキップされたタスクを除外した達成率計算
+   - 修正ファイル: `src/components/Dashboard.jsx` (lines 391-404)
+
+5. **データベーススキーマの変更**
+   - routine_tasksテーブルのuser_idカラムをNULL許可に変更
+   - organization_id列の追加（既存データは最初の組織IDで更新）
+   - SQLファイル: `database/add_organization_id_to_routines.sql`
+
+6. **ドキュメント整備**
+   - DATABASE_CLEANUP_GUIDE.md作成（データクリーンアップ手順）
+   - organizationUtils.js追加（組織管理ユーティリティ）
+
+7. **デプロイとテスト**
+   - GitHub: プッシュ完了（コミット: f5cb5b4）
+   - Vercel: 本番デプロイ完了
+   - **PC間共有テスト成功** ✅
+
+### 解決した問題
+- ✅ ルーティンがPC間で共有されない問題
+- ✅ routineTasksが配列とオブジェクトで混在する問題
+- ✅ completionRate未定義エラー
+- ✅ user_id NOT NULL制約エラー
+
+### トラブルシューティング履歴
+1. organizationIdエラー → AuthContextからorganizationIdを取得するように修正
+2. completionRateエラー → Dashboard.jsxで計算ロジックを追加
+3. routineTasks.filter is not a function → データ構造を配列に統一
+4. user_id NULL制約エラー → データベースでNULL許可に変更
+
+---
 
 ### 実施内容（2025年11月17日）
 1. **タスクのコメントを日報に追加**
