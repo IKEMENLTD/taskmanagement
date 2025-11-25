@@ -7,10 +7,10 @@ import { getCategoryText } from '../../utils/colorUtils';
 import { useDragAndDrop } from '../../hooks/useDragAndDrop';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  createRoutineTask,
-  updateRoutineTask,
-  deleteRoutineTask,
-  getRoutineTasks,
+  createRoutine,
+  updateRoutine,
+  deleteRoutine,
+  getTodaysRoutines,
   shouldRoutineRunOnDate
 } from '../../utils/routineUtils';
 import {
@@ -327,11 +327,9 @@ export const RoutineView = ({
       return;
     }
 
-    const today = getTodayDateString();
-
     if (editingRoutine) {
-      // 編集: Supabaseを更新（リアルタイム同期で自動的にstateが更新される）
-      const { data, error } = await updateRoutineTask(editingRoutine.id, {
+      // 編集: ルーティンマスターを更新（リアルタイム同期で自動的にstateが更新される）
+      const { data, error } = await updateRoutine(editingRoutine.routineId, {
         name: formData.name.trim(),
         description: formData.description.trim(),
         time: formData.time,
@@ -349,8 +347,8 @@ export const RoutineView = ({
         return;
       }
     } else {
-      // 新規追加: Supabaseに保存（リアルタイム同期で自動的にstateが更新される）
-      const { data, error } = await createRoutineTask(organizationId, {
+      // 新規追加: ルーティンマスターを作成（リアルタイム同期で自動的にstateが更新される）
+      const { data, error } = await createRoutine(organizationId, {
         name: formData.name.trim(),
         description: formData.description.trim(),
         time: formData.time,
@@ -360,7 +358,7 @@ export const RoutineView = ({
         repeat: formData.repeat,
         selectedDays: formData.selectedDays || [],
         duration: formData.duration,
-        date: today
+        userId: user.id
       });
 
       if (error) {
@@ -374,10 +372,10 @@ export const RoutineView = ({
   };
 
   const handleDelete = async (routineId) => {
-    if (!window.confirm('このルーティンを削除しますか？')) return;
+    if (!window.confirm('このルーティンを削除しますか？\n（実行記録は残りますが、今後このルーティンは表示されなくなります）')) return;
 
-    // Supabaseから削除（リアルタイム同期で自動的にstateが更新される）
-    const { error } = await deleteRoutineTask(routineId);
+    // ルーティンマスターを削除（論理削除）
+    const { error } = await deleteRoutine(routineId);
 
     if (error) {
       console.error('ルーティン削除エラー:', error);
@@ -390,8 +388,8 @@ export const RoutineView = ({
 
   // ルーティン更新
   const handleUpdateRoutine = async (updatedRoutine) => {
-    // Supabaseを更新（リアルタイム同期で自動的にstateが更新される）
-    const { error } = await updateRoutineTask(updatedRoutine.id, {
+    // ルーティンマスターを更新（リアルタイム同期で自動的にstateが更新される）
+    const { error } = await updateRoutine(updatedRoutine.routineId, {
       name: updatedRoutine.name,
       description: updatedRoutine.description,
       time: updatedRoutine.time,

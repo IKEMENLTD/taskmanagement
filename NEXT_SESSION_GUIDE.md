@@ -35,10 +35,10 @@
 - **ホスティング**: Vercel
 
 ### 📊 最新コミット情報
-- **コミットハッシュ**: `f5cb5b4`
-- **コミットメッセージ**: ルーティン管理をorganizationIdベースに変更し、PC間共有を実現
+- **コミットハッシュ**: `1dfbf75`
+- **コミットメッセージ**: fix: 日報・統計ビューの表示改善とバグ修正
 - **ブランチ**: main
-- **最終デプロイ日**: 2025年11月19日 11:30頃
+- **最終デプロイ日**: 2025年1月19日 14:50頃
 
 ---
 
@@ -679,6 +679,71 @@ localStorage.setItem('search_history', JSON.stringify(履歴配列))
 localStorage.setItem('saved_searches', JSON.stringify(検索配列))
 ```
 
+### 期間別データ取得（パターン）
+```javascript
+// 統計ビュー: 期間別にSupabaseから直接データ取得
+useEffect(() => {
+  const loadPeriodRoutines = async () => {
+    if (!organizationId || !dateRange.startDate || !dateRange.endDate) return;
+
+    const { data, error } = await supabase
+      .from('routine_tasks')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .gte('date', dateRange.startDate)
+      .lte('date', dateRange.endDate)
+      .order('date', { ascending: true });
+
+    if (!error && data) {
+      // データをマッピング
+      const mappedData = data.map(task => ({
+        id: task.id,
+        name: task.name,
+        date: task.date,
+        // ... その他のフィールド
+      }));
+      setPeriodRoutineTasks(mappedData);
+    }
+  };
+  loadPeriodRoutines();
+}, [organizationId, dateRange]);
+```
+
+### タスク完了判定（パターン）
+```javascript
+// 複数条件での完了チェック
+const isCompleted =
+  task.status === 'completed' ||
+  task.progress === 100 ||
+  task.completed === true;
+
+// 使用例
+const completedTasksCount = todayTasks.filter(task =>
+  task.status === 'completed' || task.progress === 100 || task.completed === true
+).length;
+```
+
+### Supabase upsert（パターン）
+```javascript
+// 重複を避けるupsertパターン
+const { error } = await supabase
+  .from('line_settings')
+  .upsert(settingsData, {
+    onConflict: 'organization_id',
+    ignoreDuplicates: false
+  });
+```
+
+### nullチェック（配列プロパティ）
+```javascript
+// 配列プロパティのnullチェック
+{(!routine.completedDates || routine.completedDates.length === 0) ? (
+  <EmptyState />
+) : (
+  <DataDisplay data={routine.completedDates} />
+)}
+```
+
 ---
 
 ## 🚀 次回作業開始手順
@@ -839,6 +904,26 @@ npm run dev
    - 問題: user.idベースで管理していたため、異なるPCで異なるルーティンが表示される
    - 解決策: organizationIdベースに変更、プロジェクト・タスクと同じパターンで実装、localStorage削除
 
+11. ✅ 日報でルーティンタスクが表示されない
+   - 問題: データ構造変更（オブジェクト→配列）に対応していなかった
+   - 解決策: Supabaseから直接選択日のルーティンタスクを取得、配列形式でフィルタリング
+
+12. ✅ 統計ビューでルーティンカテゴリが空
+   - 問題: Dashboardから今日のデータしか渡されていなかった
+   - 解決策: 期間別にSupabaseから直接データ取得、useEffect追加
+
+13. ✅ タスク完了が正しく反映されない
+   - 問題: status === 'completed'のみでチェックしていた
+   - 解決策: status, progress (100), completedフラグの複数条件で判定
+
+14. ✅ RoutineDetailModalでcompletedDatesがundefinedの場合のクラッシュ
+   - 問題: 新規作成されたルーティンにはcompletedDatesプロパティがない
+   - 解決策: (!routine.completedDates || routine.completedDates.length === 0)でnullチェック追加
+
+15. ✅ LINE設定の重複キーエラー
+   - 問題: React StrictModeで2回レンダリングされ、duplicate key errorが発生
+   - 解決策: 個別のselect/insert/update → upsertに変更
+
 ---
 
 ## 💡 今後の改善アイデア
@@ -982,11 +1067,68 @@ vercel --prod --yes
 
 ---
 
-**最終更新**: 2025年11月19日 11:35
+**最終更新**: 2025年1月19日 14:50
 **作成者**: Claude Code
-**セッション状態**: ✅ すべてのタスク完了、本番デプロイ済み、PC間共有テスト成功
+**セッション状態**: ✅ すべてのタスク完了、本番デプロイ済み
 
 ## 📝 今回のセッションで実施した内容
+
+### 実施内容（2025年1月19日 14:50）
+1. **日報ビューの表示修正とタスク統計追加**
+   - ルーティンタスク表示をSupabaseから直接取得
+   - データ構造変更（オブジェクト→配列）に対応
+   - 「完了したタスク」リストを「タスク統計」セクションに変更
+   - タスク完了判定を強化（status, progress, completedフラグの複数条件対応）
+   - 修正ファイル: `src/components/views/DailyReportView.jsx`
+
+2. **統計ビューのルーティンカテゴリ表示修正**
+   - Dashboardからのpropsに依存せず、期間別に直接Supabaseからデータ取得
+   - 空の場合のフォールバック表示追加
+   - ルーティン達成率トレンドグラフを削除（ユーザー要望）
+   - 修正ファイル: `src/components/views/StatisticsView.jsx`
+
+3. **グラフの見た目改善**
+   - 折れ線グラフの線を細く（strokeWidth: 2 → 0.8）
+   - データポイントマーカー（円）を削除
+   - よりシンプルで見やすいデザインに
+   - 修正ファイル: `src/components/charts/SimpleLineChart.jsx`
+
+4. **バグ修正**
+   - **RoutineDetailModal.jsx**: completedDatesがundefinedの場合のエラー修正（nullチェック追加）
+   - **lineMessagingApiUtils.js**: LINE設定の重複キーエラー修正（upsert使用）
+   - **statisticsUtils.js**: ルーティン統計の配列形式対応
+
+5. **デプロイ**
+   - コミット: 1dfbf75 "fix: 日報・統計ビューの表示改善とバグ修正"
+   - GitHub: プッシュ完了
+   - Vercel: 本番デプロイ完了 ✅
+
+### 解決した問題
+- ✅ 日報でルーティンタスクが表示されない問題
+- ✅ 統計ビューでルーティンカテゴリが空の問題
+- ✅ タスク完了が反映されない問題（複数条件での判定を実装）
+- ✅ RoutineDetailModalでcompletedDatesがundefinedの場合のクラッシュ
+- ✅ LINE設定の重複キーエラー
+
+### 修正されたファイル
+```
+src/
+├── components/
+│   ├── charts/
+│   │   └── SimpleLineChart.jsx          # グラフ見た目改善
+│   ├── modals/
+│   │   └── RoutineDetailModal.jsx       # completedDates nullチェック
+│   └── views/
+│       ├── DailyReportView.jsx          # ルーティン表示修正、タスク統計追加
+│       └── StatisticsView.jsx           # ルーティンカテゴリ表示修正
+└── utils/
+    ├── lineMessagingApiUtils.js         # upsertによる重複エラー修正
+    └── statisticsUtils.js               # 配列形式ルーティン対応
+```
+
+---
+
+## 📝 前回のセッションで実施した内容
 
 ### 実施内容（2025年11月19日）
 1. **ルーティン管理をorganizationIdベースに変更**

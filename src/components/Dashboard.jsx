@@ -10,7 +10,7 @@ import { defaultNotificationSettings } from '../utils/notificationUtils';
 import { isMobileBrowser } from '../utils/deviceUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { signOut } from '../utils/authUtils';
-import { skipRoutineTask, autoSkipPreviousDayTasks, getRoutineTasks, completeRoutineTask, resetRoutineTask } from '../utils/routineUtils';
+import { skipRoutine, autoSkipPreviousDayTasks, getTodaysRoutines, completeRoutine, resetRoutine } from '../utils/routineUtils';
 import { getAllProjects, createProject, updateProject, deleteProject, createTask, updateTask, deleteTask } from '../utils/projectUtils';
 import { getAllTeamMembers, createTeamMember, updateTeamMember, deleteTeamMember } from '../utils/teamMemberUtils';
 import { getAllRoutineCategories } from '../utils/routineCategoryUtils';
@@ -221,35 +221,37 @@ const Dashboard = () => {
       })
       .subscribe();
 
-    // ルーティンタスクの変更を監視
-    const routinesSubscription = supabase
-      .channel('routines-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'routine_tasks' }, async (payload) => {
-        console.log('ルーティンタスク変更検知:', payload);
+    // ルーティンマスターの変更を監視
+    const routinesMasterSubscription = supabase
+      .channel('routines-master-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'routines' }, async (payload) => {
+        console.log('ルーティンマスター変更検知:', payload);
 
-        // 今日のデータを再取得（プロジェクトと同じパターン）
+        // 今日のデータを再取得
         if (organizationId) {
           const today = new Date().toISOString().split('T')[0];
-          const { data, error } = await getRoutineTasks(organizationId, today);
+          const { data, error } = await getTodaysRoutines(organizationId, today);
 
           if (!error && data) {
-            const mappedData = data.map(task => ({
-              id: task.id,
-              name: task.name,
-              description: task.description || '',
-              time: task.time,
-              category: task.category,
-              projectId: task.project_id || null,
-              assignee: task.assignee,
-              repeat: task.repeat,
-              selectedDays: task.selectedDays || task.selected_days || [],
-              completed: task.completed || false,
-              status: task.status || 'pending',
-              date: task.date || today,
-              created_at: task.created_at,
-              updated_at: task.updated_at
-            }));
-            setRoutineTasks(mappedData);  // プロジェクトと同じパターン：配列で直接保存
+            setRoutineTasks(data);
+          }
+        }
+      })
+      .subscribe();
+
+    // ルーティン実行記録の変更を監視
+    const routinesTasksSubscription = supabase
+      .channel('routines-tasks-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'routine_tasks' }, async (payload) => {
+        console.log('ルーティン実行記録変更検知:', payload);
+
+        // 今日のデータを再取得
+        if (organizationId) {
+          const today = new Date().toISOString().split('T')[0];
+          const { data, error } = await getTodaysRoutines(organizationId, today);
+
+          if (!error && data) {
+            setRoutineTasks(data);
           }
         }
       })
@@ -261,7 +263,8 @@ const Dashboard = () => {
       tasksSubscription.unsubscribe();
       membersSubscription.unsubscribe();
       categoriesSubscription.unsubscribe();
-      routinesSubscription.unsubscribe();
+      routinesMasterSubscription.unsubscribe();
+      routinesTasksSubscription.unsubscribe();
     };
   }, [user, organizationId]);
 
@@ -295,7 +298,7 @@ const Dashboard = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // Supabaseから今日のルーティンタスクを読み込む
+  // Supabaseから今日のルーティンを読み込む（マスター + 実行記録）
   useEffect(() => {
     const loadRoutineTasks = async () => {
       // organizationIdが設定されていない場合は何もしない
@@ -306,35 +309,11 @@ const Dashboard = () => {
       }
 
       const today = currentTime.toISOString().split('T')[0];
-      const { data, error } = await getRoutineTasks(organizationId, today);
+      const { data, error } = await getTodaysRoutines(organizationId, today);
 
       if (!error && data) {
-        // Supabaseのデータをフロントエンドの形式にマッピング
-        const mappedData = data.map(task => ({
-          id: task.id,
-          name: task.name,
-          description: task.description || '',
-          time: task.time,
-          category: task.category,
-          projectId: task.project_id || null,
-          assignee: task.assignee,
-          repeat: task.repeat,
-          selectedDays: task.selectedDays || task.selected_days || [],
-          duration: task.duration,
-          date: task.date,
-          status: task.status,
-          skip_reason: task.skip_reason || null,
-          completed: task.status === 'completed',
-          completed_at: task.completed_at,
-          skipped_at: task.skipped_at,
-          notes: '',
-          streak: 0,
-          completedDates: [],
-          created_at: task.created_at,
-          updated_at: task.updated_at
-        }));
-
-        setRoutineTasks(mappedData);  // プロジェクトと同じパターン：配列で保存
+        // getTodaysRoutinesは既に正しい形式で返すので、そのまま使用
+        setRoutineTasks(data);
       }
     };
 
@@ -399,47 +378,60 @@ const Dashboard = () => {
     return eligibleTasks > 0 ? Math.round((completed / eligibleTasks) * 100) : 0;
   }, [routineTasks, currentTime]);
 
-  // ルーティン切り替えハンドラー（プロジェクトと同じパターン）
+  // ルーティン切り替えハンドラー（新しい構造に対応）
   const handleToggleRoutine = useCallback(async (taskId) => {
     const today = currentTime.toISOString().split('T')[0];
     const task = routineTasks.find(t => t.id === taskId);
 
     if (!task) return;
+    if (!organizationId) {
+      alert('組織情報を取得中です。少々お待ちください。');
+      return;
+    }
 
     const newCompletedStatus = !(task.completed || task.status === 'completed');
 
     // Supabaseを更新（リアルタイム同期で自動的にstateが更新される）
     if (newCompletedStatus) {
-      const { error } = await completeRoutineTask(taskId);
+      const { error } = await completeRoutine(organizationId, task.routineId, task.id, today);
       if (error) {
         console.error('ルーティン完了エラー:', error);
         alert('ルーティンの完了に失敗しました。');
         return;
       }
     } else {
-      const { error } = await resetRoutineTask(taskId);
+      const { error } = await resetRoutine(task.id);
       if (error) {
         console.error('ルーティンリセットエラー:', error);
         alert('ルーティンのリセットに失敗しました。');
         return;
       }
     }
-  }, [currentTime, routineTasks]);
+  }, [currentTime, routineTasks, organizationId]);
 
-  // ルーティンスキップハンドラー（プロジェクトと同じパターン）
+  // ルーティンスキップハンドラー（新しい構造に対応）
   const handleSkipRoutine = useCallback(async (taskId) => {
+    const today = currentTime.toISOString().split('T')[0];
+    const task = routineTasks.find(t => t.id === taskId);
+
+    if (!task) return;
+    if (!organizationId) {
+      alert('組織情報を取得中です。少々お待ちください。');
+      return;
+    }
+
     // スキップ理由を入力するプロンプトを表示（オプション）
     const reason = window.prompt('スキップ理由を入力してください（任意）:');
 
     // Supabaseのスキップ関数を呼び出し（リアルタイム同期で自動的にstateが更新される）
-    const { data, error } = await skipRoutineTask(taskId, reason);
+    const { data, error } = await skipRoutine(organizationId, task.routineId, task.id, today, reason);
 
     if (error) {
       console.error('ルーティンスキップエラー:', error);
       alert('スキップに失敗しました。もう一度お試しください。');
       return;
     }
-  }, []);
+  }, [currentTime, routineTasks, organizationId]);
 
   // タスク更新ハンドラー（useCallbackで最適化）
   const handleUpdateTask = useCallback(async (updatedTask) => {
