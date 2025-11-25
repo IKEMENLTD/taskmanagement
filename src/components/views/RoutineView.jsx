@@ -586,7 +586,7 @@ export const RoutineView = ({
           <div className="space-y-2">
             {routinesWithProject.map(routine => (
               <RoutineCard
-                key={routine.id}
+                key={routine.routineId}
                 routine={routine}
                 onToggle={onToggleRoutine}
                 onSkip={onSkipRoutine}
@@ -613,7 +613,7 @@ export const RoutineView = ({
           <div className="space-y-2">
             {routinesWithoutProject.map(routine => (
               <RoutineCard
-                key={routine.id}
+                key={routine.routineId}
                 routine={routine}
                 onToggle={onToggleRoutine}
                 onSkip={onSkipRoutine}
