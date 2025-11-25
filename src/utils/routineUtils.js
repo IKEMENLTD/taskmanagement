@@ -320,13 +320,32 @@ export const completeRoutine = async (organizationId, routineId, taskRecordId, d
         completed_at: new Date().toISOString()
       });
     } else {
-      // 実行記録を新規作成
+      // 実行記録を新規作成（ルーティンマスターから情報を取得）
+      const { data: routine, error: routineError } = await supabase
+        .from('routines')
+        .select('*')
+        .eq('id', routineId)
+        .single();
+
+      if (routineError) {
+        console.error('ルーティンマスター取得エラー:', routineError);
+        return { data: null, error: routineError };
+      }
+
       const { data, error } = await supabase
         .from('routine_tasks')
         .insert([{
           organization_id: organizationId,
           routine_id: routineId,
           date: date,
+          name: routine.name,
+          description: routine.description,
+          time: routine.time,
+          category: routine.category,
+          project_id: routine.project_id,
+          assignee: routine.assignee,
+          repeat: routine.repeat,
+          duration: routine.duration,
           status: 'completed',
           completed_at: new Date().toISOString()
         }])
@@ -365,13 +384,32 @@ export const skipRoutine = async (organizationId, routineId, taskRecordId, date,
         skip_reason: reason
       });
     } else {
-      // 実行記録を新規作成
+      // 実行記録を新規作成（ルーティンマスターから情報を取得）
+      const { data: routine, error: routineError } = await supabase
+        .from('routines')
+        .select('*')
+        .eq('id', routineId)
+        .single();
+
+      if (routineError) {
+        console.error('ルーティンマスター取得エラー:', routineError);
+        return { data: null, error: routineError };
+      }
+
       const { data, error } = await supabase
         .from('routine_tasks')
         .insert([{
           organization_id: organizationId,
           routine_id: routineId,
           date: date,
+          name: routine.name,
+          description: routine.description,
+          time: routine.time,
+          category: routine.category,
+          project_id: routine.project_id,
+          assignee: routine.assignee,
+          repeat: routine.repeat,
+          duration: routine.duration,
           status: 'skipped',
           skipped_at: new Date().toISOString(),
           skip_reason: reason

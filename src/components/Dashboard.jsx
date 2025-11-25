@@ -131,25 +131,10 @@ const Dashboard = () => {
 
     // ルーティンタスクを取得
     const today = new Date().toISOString().split('T')[0];
-    const { data: routinesData, error: routinesError } = await getRoutineTasks(organizationId, today);
+    const { data: routinesData, error: routinesError } = await getTodaysRoutines(organizationId, today);
     if (!routinesError && routinesData) {
-      const mappedData = routinesData.map(task => ({
-        id: task.id,
-        name: task.name,
-        description: task.description || '',
-        time: task.time,
-        category: task.category,
-        projectId: task.project_id || null,
-        assignee: task.assignee,
-        repeat: task.repeat,
-        selectedDays: task.selectedDays || task.selected_days || [],
-        completed: task.completed || false,
-        status: task.status || 'pending',
-        date: task.date || today,
-        created_at: task.created_at,
-        updated_at: task.updated_at
-      }));
-      setRoutineTasks(mappedData);  // プロジェクトと同じパターン：配列で保存
+      // getTodaysRoutinesは既に正しい形式で返すので、そのまま使用
+      setRoutineTasks(routinesData);
     }
 
     setIsLoadingData(false);
