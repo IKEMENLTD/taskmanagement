@@ -372,6 +372,11 @@ export const RoutineView = ({
   };
 
   const handleDelete = async (routineId) => {
+    if (!routineId) {
+      alert('ルーティンIDが見つかりません。ページを再読み込みしてください。');
+      return;
+    }
+
     if (!window.confirm('このルーティンを削除しますか？\n（実行記録は残りますが、今後このルーティンは表示されなくなります）')) return;
 
     // ルーティンマスターを削除（論理削除）
@@ -956,7 +961,7 @@ export const RoutineView = ({
           onClose={closeDetailModal}
           onToggle={onToggleRoutine}
           onEdit={() => handleEditFromDetail(selectedRoutine)}
-          onDelete={() => handleDelete(selectedRoutine.id)}
+          onDelete={() => handleDelete(selectedRoutine.routineId)}
           onUpdateRoutine={handleUpdateRoutine}
           projects={projects}
           darkMode={darkMode}
