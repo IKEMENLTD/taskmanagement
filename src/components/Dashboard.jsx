@@ -364,11 +364,20 @@ const Dashboard = () => {
   }, [routineTasks, currentTime]);
 
   // ルーティン切り替えハンドラー（新しい構造に対応）
+  // taskIdは実行記録IDまたはルーティンマスターIDのどちらかで渡される可能性がある
   const handleToggleRoutine = useCallback(async (taskId) => {
     const today = currentTime.toISOString().split('T')[0];
-    const task = routineTasks.find(t => t.id === taskId);
 
-    if (!task) return;
+    // まず実行記録ID(id)で検索、見つからなければルーティンマスターID(routineId)で検索
+    let task = routineTasks.find(t => t.id === taskId);
+    if (!task) {
+      task = routineTasks.find(t => t.routineId === taskId);
+    }
+
+    if (!task) {
+      console.error('ルーティンが見つかりません:', taskId);
+      return;
+    }
     if (!organizationId) {
       alert('組織情報を取得中です。少々お待ちください。');
       return;
@@ -395,11 +404,20 @@ const Dashboard = () => {
   }, [currentTime, routineTasks, organizationId]);
 
   // ルーティンスキップハンドラー（新しい構造に対応）
+  // taskIdは実行記録IDまたはルーティンマスターIDのどちらかで渡される可能性がある
   const handleSkipRoutine = useCallback(async (taskId) => {
     const today = currentTime.toISOString().split('T')[0];
-    const task = routineTasks.find(t => t.id === taskId);
 
-    if (!task) return;
+    // まず実行記録ID(id)で検索、見つからなければルーティンマスターID(routineId)で検索
+    let task = routineTasks.find(t => t.id === taskId);
+    if (!task) {
+      task = routineTasks.find(t => t.routineId === taskId);
+    }
+
+    if (!task) {
+      console.error('ルーティンが見つかりません:', taskId);
+      return;
+    }
     if (!organizationId) {
       alert('組織情報を取得中です。少々お待ちください。');
       return;
@@ -448,6 +466,13 @@ const Dashboard = () => {
 
   // タスク削除ハンドラー（useCallbackで最適化）
   const handleDeleteTask = useCallback(async (taskId, projectId) => {
+    // タスクIDのバリデーション
+    if (taskId === undefined || taskId === null) {
+      console.error('タスク削除エラー: タスクIDが指定されていません', { taskId, projectId });
+      alert('タスクIDが見つかりません。ページを再読み込みしてください。');
+      return;
+    }
+
     if (!window.confirm('このタスクを削除しますか？')) return;
 
     // Supabaseから削除
@@ -455,7 +480,7 @@ const Dashboard = () => {
 
     if (error) {
       console.error('タスク削除エラー:', error);
-      alert('タスクの削除に失敗しました');
+      alert(`タスクの削除に失敗しました: ${error.message || 'エラーが発生しました'}`);
       return;
     }
 
@@ -632,7 +657,7 @@ const Dashboard = () => {
                 setTeamMembers={setTeamMembers}
                 darkMode={darkMode}
                 projects={projects}
-                routineTasks={routineTasks}
+                routines={routineTasks}
               />
             )}
 
@@ -899,7 +924,7 @@ const Dashboard = () => {
                 setTeamMembers={setTeamMembers}
                 darkMode={darkMode}
                 projects={projects}
-                routineTasks={routineTasks}
+                routines={routineTasks}
               />
             )}
 

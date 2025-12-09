@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Users, Plus, X, Edit, Trash2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Users, Plus, X, Edit, Trash2, Briefcase, CheckSquare, RotateCcw, AlertTriangle, Calendar } from 'lucide-react';
 import { MemberCard } from '../cards/MemberCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { createTeamMember, updateTeamMember, deleteTeamMember } from '../../utils/teamMemberUtils';
+import { calculateMemberWorkload, getLoadColor, getLoadBgColor, getLoadLabel } from '../../utils/workloadUtils';
 
 /**
  * チームビューコンポーネント
@@ -11,9 +12,31 @@ import { createTeamMember, updateTeamMember, deleteTeamMember } from '../../util
  * @param {Function} setTeamMembers - チームメンバー更新関数
  * @param {boolean} darkMode - ダークモードフラグ
  * @param {Array} projects - プロジェクト一覧
- * @param {Object} routineTasks - ルーティンタスク
+ * @param {Array} routines - ルーティン一覧（マスターデータ）
+ * @param {Object} routineTasks - ルーティンタスク（後方互換性のため残す）
  */
-export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode = false, projects = [], routineTasks = {} }) => {
+export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode = false, projects = [], routines = [], routineTasks = {} }) => {
+
+  // 全メンバーの負荷情報を計算
+  const memberWorkloads = useMemo(() => {
+    const workloads = {};
+    teamMembers.forEach(member => {
+      workloads[member.name] = calculateMemberWorkload(member.name, projects, routines);
+    });
+    return workloads;
+  }, [teamMembers, projects, routines]);
+
+  // チーム全体の統計
+  const teamStats = useMemo(() => {
+    const totalLoad = Object.values(memberWorkloads).reduce((sum, w) => sum + w.load, 0);
+    const avgLoad = teamMembers.length > 0 ? Math.round(totalLoad / teamMembers.length) : 0;
+    const busyCount = Object.values(memberWorkloads).filter(w => w.availability === 'busy').length;
+    const availableCount = teamMembers.length - busyCount;
+    const totalTasks = Object.values(memberWorkloads).reduce((sum, w) => sum + w.taskCount, 0);
+    const totalOverdue = Object.values(memberWorkloads).reduce((sum, w) => sum + w.overdueTasks.length, 0);
+
+    return { avgLoad, busyCount, availableCount, totalTasks, totalOverdue };
+  }, [memberWorkloads, teamMembers]);
   // 認証情報
   const { user } = useAuth();
 
@@ -348,8 +371,9 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {teamMembers.map((member, index) => (
           <MemberCard
-            key={index}
+            key={member.id || index}
             member={member}
+            workload={memberWorkloads[member.name]}
             onClick={() => openDetailModal(member)}
             darkMode={darkMode}
           />
@@ -359,7 +383,7 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
       {/* チーム統計サマリー */}
       <div className={`${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-xl p-6 border`}>
         <h3 className={`text-lg font-bold ${textColor} mb-4`}>チーム統計</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div>
             <div className={`text-sm ${textSecondary} mb-1`}>総メンバー数</div>
             <div className={`text-3xl font-bold ${textColor}`}>{teamMembers.length}</div>
@@ -367,21 +391,25 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
           <div>
             <div className={`text-sm ${textSecondary} mb-1`}>サポート可能</div>
             <div className={`text-3xl font-bold text-green-500`}>
-              {teamMembers.filter(m => m.availability === 'available').length}
+              {teamStats.availableCount}
             </div>
           </div>
           <div>
-            <div className={`text-sm ${textSecondary} mb-1`}>手いっぱい</div>
+            <div className={`text-sm ${textSecondary} mb-1`}>高負荷</div>
             <div className={`text-3xl font-bold text-red-500`}>
-              {teamMembers.filter(m => m.availability === 'busy').length}
+              {teamStats.busyCount}
             </div>
           </div>
           <div>
             <div className={`text-sm ${textSecondary} mb-1`}>平均負荷率</div>
-            <div className={`text-3xl font-bold ${textColor}`}>
-              {teamMembers.length > 0
-                ? Math.round(teamMembers.reduce((sum, m) => sum + (m.load || 0), 0) / teamMembers.length)
-                : 0}%
+            <div className={`text-3xl font-bold ${getLoadColor(teamStats.avgLoad, darkMode)}`}>
+              {teamStats.avgLoad}%
+            </div>
+          </div>
+          <div>
+            <div className={`text-sm ${textSecondary} mb-1`}>期限切れタスク</div>
+            <div className={`text-3xl font-bold ${teamStats.totalOverdue > 0 ? 'text-red-500' : 'text-green-500'}`}>
+              {teamStats.totalOverdue}
             </div>
           </div>
         </div>
@@ -570,8 +598,9 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
 
       {/* メンバー詳細モーダル */}
       {showDetailModal && selectedMember && (() => {
-        const memberLoad = selectedMember.load || 0;
-        const memberAvailability = selectedMember.availability || 'available';
+        const workload = memberWorkloads[selectedMember.name] || {};
+        const memberLoad = workload.load ?? selectedMember.load ?? 0;
+        const memberAvailability = workload.availability ?? selectedMember.availability ?? 'available';
 
         return (
           <div
@@ -579,7 +608,7 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
             onClick={closeDetailModal}
           >
             <div
-              className={`${cardBg} rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border shadow-2xl`}
+              className={`${cardBg} rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto border shadow-2xl`}
               onClick={(e) => e.stopPropagation()}
             >
               {/* ヘッダー */}
@@ -614,25 +643,167 @@ export const TeamView = ({ teamMembers, onMemberClick, setTeamMembers, darkMode 
               {/* コンテンツ */}
               <div className="p-6 space-y-6">
                 {/* 統計情報 */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
                     <div className={`text-sm ${textSecondary} mb-1`}>負荷率</div>
-                    <div className={`text-3xl font-bold ${
-                      memberLoad >= 85 ? 'text-red-500' :
-                      memberLoad >= 70 ? 'text-yellow-500' :
-                      'text-green-500'
-                    }`}>{memberLoad}%</div>
+                    <div className={`text-3xl font-bold ${getLoadColor(memberLoad, darkMode)}`}>
+                      {memberLoad}%
+                    </div>
+                    <div className={`text-xs ${textSecondary} mt-1`}>{getLoadLabel(memberLoad)}</div>
                   </div>
                   <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
-                    <div className={`text-sm ${textSecondary} mb-1`}>稼働状態</div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <div className={`w-3 h-3 rounded-full ${memberAvailability === 'available' ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                      <span className={`text-lg font-bold ${textColor}`}>
-                        {memberAvailability === 'available' ? 'サポート可能' : '手いっぱい'}
-                      </span>
+                    <div className={`text-sm ${textSecondary} mb-1`}>担当プロジェクト</div>
+                    <div className={`text-3xl font-bold ${darkMode ? 'text-blue-400' : 'text-blue-500'}`}>
+                      {workload.projectCount || 0}
+                    </div>
+                  </div>
+                  <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
+                    <div className={`text-sm ${textSecondary} mb-1`}>担当タスク</div>
+                    <div className={`text-3xl font-bold ${darkMode ? 'text-green-400' : 'text-green-500'}`}>
+                      {workload.taskCount || 0}
+                    </div>
+                  </div>
+                  <div className={`${darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-lg p-4`}>
+                    <div className={`text-sm ${textSecondary} mb-1`}>今日のルーティン</div>
+                    <div className={`text-3xl font-bold ${darkMode ? 'text-purple-400' : 'text-purple-500'}`}>
+                      {workload.routineCount || 0}
                     </div>
                   </div>
                 </div>
+
+                {/* 負荷率の内訳 */}
+                {workload.loadBreakdown && (
+                  <div className={`${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} rounded-lg p-4`}>
+                    <h3 className={`text-sm font-semibold ${textColor} mb-3`}>負荷率の内訳</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className={`text-sm ${textSecondary}`}>基礎負荷（タスク×10 + ルーティン×5）</span>
+                        <span className={`text-sm font-medium ${textColor}`}>{workload.loadBreakdown.baseLoad}%</span>
+                      </div>
+                      {workload.loadBreakdown.todayDuePenalty > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className={`text-sm ${textSecondary}`}>本日期限ペナルティ</span>
+                          <span className="text-sm font-medium text-yellow-500">+{workload.loadBreakdown.todayDuePenalty}%</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* プログレスバー */}
+                    <div className="mt-3">
+                      <div className={`w-full ${darkMode ? 'bg-gray-600' : 'bg-gray-200'} rounded-full h-2`}>
+                        <div
+                          className={`${getLoadBgColor(memberLoad)} h-2 rounded-full transition-all`}
+                          style={{ width: `${Math.min(memberLoad, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 期限切れタスク警告 */}
+                {workload.overdueTasks && workload.overdueTasks.length > 0 && (
+                  <div className={`${darkMode ? 'bg-red-900/30' : 'bg-red-50'} rounded-lg p-4`}>
+                    <h3 className={`text-sm font-semibold ${darkMode ? 'text-red-400' : 'text-red-600'} mb-3 flex items-center gap-2`}>
+                      <AlertTriangle size={16} />
+                      期限切れタスク ({workload.overdueTasks.length}件)
+                    </h3>
+                    <div className="space-y-2">
+                      {workload.overdueTasks.slice(0, 5).map((task, index) => (
+                        <div key={index} className={`flex justify-between items-center text-sm ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                          <span className="truncate flex-1">{task.projectName} - {task.name}</span>
+                          <span className="ml-2 whitespace-nowrap">期限: {task.dueDate}</span>
+                        </div>
+                      ))}
+                      {workload.overdueTasks.length > 5 && (
+                        <div className={`text-sm ${darkMode ? 'text-red-400' : 'text-red-500'}`}>
+                          ...他 {workload.overdueTasks.length - 5} 件
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 担当プロジェクト一覧 */}
+                {workload.projects && workload.projects.length > 0 && (
+                  <div>
+                    <h3 className={`text-lg font-semibold ${textColor} mb-3 flex items-center gap-2`}>
+                      <Briefcase size={18} />
+                      担当プロジェクト
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {workload.projects.map((project, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 rounded-full text-sm text-white"
+                          style={{ backgroundColor: project.color || '#6b7280' }}
+                        >
+                          {project.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 担当タスク一覧 */}
+                {workload.activeTasks && workload.activeTasks.length > 0 && (
+                  <div>
+                    <h3 className={`text-lg font-semibold ${textColor} mb-3 flex items-center gap-2`}>
+                      <CheckSquare size={18} />
+                      担当タスク ({workload.activeTasks.length}件)
+                    </h3>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {workload.activeTasks.map((task, index) => (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <div
+                              className="w-3 h-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: task.projectColor || '#6b7280' }}
+                            ></div>
+                            <span className={`text-sm ${textColor} truncate`}>{task.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                            {task.dueDate && (
+                              <span className={`text-xs ${textSecondary} flex items-center gap-1`}>
+                                <Calendar size={12} />
+                                {task.dueDate}
+                              </span>
+                            )}
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              task.priority === 'high' ? 'bg-red-100 text-red-700' :
+                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {task.priority === 'high' ? '高' : task.priority === 'medium' ? '中' : '低'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 今日のルーティン */}
+                {workload.routines && workload.routines.length > 0 && (
+                  <div>
+                    <h3 className={`text-lg font-semibold ${textColor} mb-3 flex items-center gap-2`}>
+                      <RotateCcw size={18} />
+                      今日のルーティン
+                    </h3>
+                    <div className="space-y-2">
+                      {workload.routines.map((routine, index) => (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-2 rounded-lg ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}
+                        >
+                          <span className={`text-sm ${textColor}`}>{routine.name}</span>
+                          <span className={`text-xs ${textSecondary}`}>{routine.time}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* スキル */}
                 {selectedMember.skills && selectedMember.skills.length > 0 && (

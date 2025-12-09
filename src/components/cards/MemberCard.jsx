@@ -1,33 +1,28 @@
 import React, { memo } from 'react';
-import { User } from 'lucide-react';
-
-// ヘルパー関数をコンポーネント外に定義（パフォーマンス向上）
-const getLoadColor = (load, darkMode) => {
-  if (load >= 85) return darkMode ? 'text-red-400' : 'text-red-500';
-  if (load >= 70) return darkMode ? 'text-yellow-400' : 'text-yellow-500';
-  return darkMode ? 'text-green-400' : 'text-green-500';
-};
-
-const getLoadBgColor = (load) => {
-  if (load >= 85) return 'bg-red-500';
-  if (load >= 70) return 'bg-yellow-500';
-  return 'bg-green-500';
-};
+import { User, Briefcase, CheckSquare, RotateCcw, AlertTriangle } from 'lucide-react';
+import { getLoadColor, getLoadBgColor, getLoadLabel } from '../../utils/workloadUtils';
 
 /**
  * チームメンバーカードコンポーネント（React.memoで最適化）
  * @param {Object} member - メンバーオブジェクト
+ * @param {Object} workload - 負荷情報（workloadUtils.calculateMemberWorkloadの結果）
  * @param {Function} onClick - クリックハンドラー
  * @param {boolean} darkMode - ダークモードフラグ
  */
-const MemberCardComponent = ({ member, onClick, darkMode = false }) => {
+const MemberCardComponent = ({ member, workload, onClick, darkMode = false }) => {
 
   // アバターがURLかどうかを判定
   const isAvatarUrl = member.avatar && (member.avatar.startsWith('http://') || member.avatar.startsWith('https://'));
 
-  // loadのデフォルト値
-  const load = member.load || 0;
-  const availability = member.availability || 'available';
+  // 負荷情報を取得（workloadがあれば自動計算値、なければ手動値）
+  const load = workload?.load ?? member.load ?? 0;
+  const availability = workload?.availability ?? member.availability ?? 'available';
+
+  // 担当数
+  const projectCount = workload?.projectCount ?? 0;
+  const taskCount = workload?.taskCount ?? 0;
+  const routineCount = workload?.routineCount ?? 0;
+  const overdueCount = workload?.overdueTasks?.length ?? 0;
 
   return (
     <div
@@ -57,8 +52,50 @@ const MemberCardComponent = ({ member, onClick, darkMode = false }) => {
             </p>
           </div>
         </div>
-        <div className={`text-2xl font-bold ${getLoadColor(load, darkMode)}`}>
-          {load}%
+        <div className="text-right">
+          <div className={`text-2xl font-bold ${getLoadColor(load, darkMode)}`}>
+            {load}%
+          </div>
+          <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            {getLoadLabel(load)}
+          </div>
+        </div>
+      </div>
+
+      {/* 担当数サマリー */}
+      <div className={`grid grid-cols-3 gap-2 mb-3 p-2 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1">
+            <Briefcase size={12} className={darkMode ? 'text-blue-400' : 'text-blue-500'} />
+            <span className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              {projectCount}
+            </span>
+          </div>
+          <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            PJ
+          </div>
+        </div>
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1">
+            <CheckSquare size={12} className={darkMode ? 'text-green-400' : 'text-green-500'} />
+            <span className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              {taskCount}
+            </span>
+          </div>
+          <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            タスク
+          </div>
+        </div>
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1">
+            <RotateCcw size={12} className={darkMode ? 'text-purple-400' : 'text-purple-500'} />
+            <span className={`text-lg font-bold ${darkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+              {routineCount}
+            </span>
+          </div>
+          <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            ルーティン
+          </div>
         </div>
       </div>
 
@@ -75,10 +112,20 @@ const MemberCardComponent = ({ member, onClick, darkMode = false }) => {
         <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} rounded-full h-2`}>
           <div
             className={`${getLoadBgColor(load)} h-2 rounded-full transition-all`}
-            style={{ width: `${load}%` }}
+            style={{ width: `${Math.min(load, 100)}%` }}
           ></div>
         </div>
       </div>
+
+      {/* 警告表示（期限切れタスクがある場合） */}
+      {overdueCount > 0 && (
+        <div className={`flex items-center gap-2 mb-3 p-2 rounded-lg ${darkMode ? 'bg-red-900/30' : 'bg-red-50'}`}>
+          <AlertTriangle size={14} className="text-red-500" />
+          <span className={`text-xs ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+            期限切れタスク: {overdueCount}件
+          </span>
+        </div>
+      )}
 
       {/* 稼働状態 */}
       <div className="flex items-center gap-2">
