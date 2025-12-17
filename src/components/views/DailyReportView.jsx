@@ -118,6 +118,9 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
     const completedTasks = [];
 
     projects.forEach(project => {
+      // 保留中プロジェクトは除外
+      if (project.status === 'pending') return;
+
       if (project.tasks) {
         project.tasks.forEach(task => {
           // メンバーフィルター
@@ -133,8 +136,8 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
               projectColor: project.color
             });
           }
-          // 進行中・ブロック中のタスクをすべて表示（completedは除外）
-          else if (task.status !== 'completed') {
+          // 進行中・ブロック中のタスクを表示（完了・保留中は除外）
+          else if (task.status !== 'completed' && task.status !== 'pending') {
             updatedTasks.push({
               ...task,
               projectName: project.name,
@@ -145,8 +148,9 @@ export const DailyReportView = ({ projects, routineTasks, teamMembers, darkMode 
       }
     });
 
-    // プロジェクト進捗
-    const projectProgress = projects.map(project => ({
+    const projectProgress = projects
+      .filter(project => project.status !== 'pending')
+      .map(project => ({
       name: project.name,
       progress: project.progress,
       status: project.status,

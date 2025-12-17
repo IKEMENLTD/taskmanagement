@@ -1005,24 +1005,21 @@ export const TimelineView = ({ projects, onTaskClick, setProjects, teamMembers =
               <div>
                 <h4 className={`text-lg font-semibold ${textColor} mb-4`}>👥 チームメンバー</h4>
                 <div className="space-y-3">
-                  <div className="flex gap-2">
+                  <div>
                     <select
-                      value={memberInput}
-                      onChange={(e) => setMemberInput(e.target.value)}
-                      className={`flex-1 px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleAddMember(e.target.value);
+                        }
+                      }}
+                      className={`w-full px-4 py-2 rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-50 text-gray-900'} border ${darkMode ? 'border-gray-600' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                     >
-                      <option value="">メンバーを選択してください</option>
+                      <option value="">メンバーを選択して追加</option>
                       {teamMembers.filter(m => !formData.team.includes(m.name)).map(member => (
                         <option key={member.name} value={member.name}>{member.name}</option>
                       ))}
                     </select>
-                    <button
-                      onClick={() => handleAddMember(memberInput)}
-                      disabled={!memberInput}
-                      className={`px-4 py-2 rounded-lg ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'} text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                      追加
-                    </button>
                   </div>
 
                   {/* チームメンバータグ一覧 */}

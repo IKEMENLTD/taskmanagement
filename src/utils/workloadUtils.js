@@ -17,10 +17,16 @@ const getTodayString = () => {
  * @param {Array} projects - プロジェクト一覧
  * @returns {Array} 担当タスク一覧
  */
-export const getMemberTasks = (memberName, projects) => {
+export const getMemberTasks = (memberName, projects, excludePending = true) => {
   const tasks = [];
   projects.forEach(project => {
+    // 保留中のプロジェクトは除外
+    if (excludePending && project.status === 'pending') return;
+
     (project.tasks || []).forEach(task => {
+      // 保留中タスクは除外
+      if (excludePending && task.status === 'pending') return;
+
       if (task.assignee === memberName) {
         tasks.push({
           ...task,

@@ -72,13 +72,24 @@ export const createProject = async (projectData) => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
 
+    // 双方向同期: 新規作成時も適用
+    let status = projectData.status || 'active';
+    let progress = projectData.progress || 0;
+
+    if (progress === 100 && status !== 'completed') {
+      status = 'completed';
+    }
+    if (status === 'completed' && progress !== 100) {
+      progress = 100;
+    }
+
     const { data, error } = await supabase
       .from('projects')
       .insert([{
         name: projectData.name,
         color: projectData.color,
-        status: projectData.status || 'active',
-        progress: projectData.progress || 0,
+        status: status,
+        progress: progress,
         timeline_start: projectData.timeline?.start || null,
         timeline_end: projectData.timeline?.end || null,
         team: projectData.team || [],
@@ -122,6 +133,15 @@ export const updateProject = async (projectId, updates) => {
     // teamが配列でない場合は空配列に変換
     if (updateData.team && !Array.isArray(updateData.team)) {
       updateData.team = [];
+    }
+
+    // 双方向同期: 進捗100%ならステータスを完了に
+    if (updateData.progress === 100 && updateData.status !== 'completed') {
+      updateData.status = 'completed';
+    }
+    // 双方向同期: ステータスが完了なら進捗を100%に
+    if (updateData.status === 'completed' && updateData.progress !== 100) {
+      updateData.progress = 100;
     }
 
     const { data, error } = await supabase
@@ -177,19 +197,33 @@ export const createTask = async (projectId, taskData) => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
 
+    // 双方向同期: 新規作成時も適用
+    let status = taskData.status || 'active';
+    let progress = taskData.progress || 0;
+    let completedDate = taskData.completedDate || null;
+
+    if (progress === 100 && status !== 'completed') {
+      status = 'completed';
+      completedDate = completedDate || new Date().toISOString().split('T')[0];
+    }
+    if (status === 'completed' && progress !== 100) {
+      progress = 100;
+      completedDate = completedDate || new Date().toISOString().split('T')[0];
+    }
+
     const { data, error } = await supabase
       .from('tasks')
       .insert([{
         project_id: projectId,
         name: taskData.name,
         description: taskData.description || null,
-        status: taskData.status || 'active',
+        status: status,
         priority: taskData.priority || 'medium',
-        progress: taskData.progress || 0,
+        progress: progress,
         assignee: taskData.assignee || null,
         start_date: taskData.startDate || null,
         due_date: taskData.dueDate || null,
-        completed_date: taskData.completedDate || null,
+        completed_date: completedDate,
         dependencies: taskData.dependencies || [],
         created_by: user?.id
       }])
@@ -199,6 +233,14 @@ export const createTask = async (projectId, taskData) => {
     if (error) {
       console.error('タスク作成エラー:', error);
       return { data: null, error };
+    }
+
+
+    // 日程の自動同期: タスク作成時にプロジェクトの日程を更新
+    if (data && projectId && (taskData.startDate || taskData.dueDate)) {
+      syncProjectTimeline(projectId).catch(err => {
+        console.error('プロジェクト日程同期エラー:', err);
+      });
     }
 
     return { data, error: null };
@@ -245,6 +287,23 @@ export const updateTask = async (taskId, updates) => {
       delete updateData.completedDate;
     }
 
+    // 双方向同期: 進捗100%ならステータスを完了に
+    if (updateData.progress === 100 && updateData.status !== 'completed') {
+      updateData.status = 'completed';
+      // 完了日も自動設定
+      if (!updateData.completed_date) {
+        updateData.completed_date = new Date().toISOString().split('T')[0];
+      }
+    }
+    // 双方向同期: ステータスが完了なら進捗を100%に
+    if (updateData.status === 'completed' && updateData.progress !== 100) {
+      updateData.progress = 100;
+      // 完了日も自動設定
+      if (!updateData.completed_date) {
+        updateData.completed_date = new Date().toISOString().split('T')[0];
+      }
+    }
+
     const { data, error } = await supabase
       .from('tasks')
       .update(updateData)
@@ -255,6 +314,14 @@ export const updateTask = async (taskId, updates) => {
     if (error) {
       console.error('タスク更新エラー:', error);
       return { data: null, error };
+    }
+
+
+    // 日程の自動同期: タスクの日付が変更された場合、プロジェクトの日程を更新
+    if (data && data.project_id && (updates.startDate !== undefined || updates.dueDate !== undefined)) {
+      syncProjectTimeline(data.project_id).catch(err => {
+        console.error('プロジェクト日程同期エラー:', err);
+      });
     }
 
     return { data, error: null };
@@ -393,6 +460,77 @@ export const bulkUpdateTaskStartDates = async (startDate) => {
     return { data: { updated: updatedCount, total: totalTasks }, error: null };
   } catch (err) {
     console.error('❌ 一括更新エラー:', err);
+    return { data: null, error: err };
+  }
+};
+
+/**
+ * プロジェクトの日程をタスクから自動計算して更新
+ * @param {number} projectId - プロジェクトID
+ * @returns {Promise<{data: any, error: any}>}
+ */
+export const syncProjectTimeline = async (projectId) => {
+  try {
+    // プロジェクトの全タスクを取得
+    const { data: tasks, error: tasksError } = await supabase
+      .from('tasks')
+      .select('start_date, due_date')
+      .eq('project_id', projectId);
+
+    if (tasksError) {
+      console.error('タスク取得エラー:', tasksError);
+      return { data: null, error: tasksError };
+    }
+
+    if (!tasks || tasks.length === 0) {
+      return { data: null, error: null };
+    }
+
+    // 有効な日付を持つタスクのみフィルター
+    const validStartDates = tasks
+      .filter(t => t.start_date)
+      .map(t => new Date(t.start_date));
+    const validEndDates = tasks
+      .filter(t => t.due_date)
+      .map(t => new Date(t.due_date));
+
+    if (validStartDates.length === 0 && validEndDates.length === 0) {
+      return { data: null, error: null };
+    }
+
+    // 最早開始日と最遅終了日を計算
+    const updateData = {};
+    
+    if (validStartDates.length > 0) {
+      const earliestStart = new Date(Math.min(...validStartDates));
+      updateData.timeline_start = earliestStart.toISOString().split('T')[0];
+    }
+    
+    if (validEndDates.length > 0) {
+      const latestEnd = new Date(Math.max(...validEndDates));
+      updateData.timeline_end = latestEnd.toISOString().split('T')[0];
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return { data: null, error: null };
+    }
+
+    // プロジェクトを更新
+    const { data, error } = await supabase
+      .from('projects')
+      .update(updateData)
+      .eq('id', projectId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('プロジェクト日程更新エラー:', error);
+      return { data: null, error };
+    }
+
+    return { data, error: null };
+  } catch (err) {
+    console.error('プロジェクト日程同期エラー:', err);
     return { data: null, error: err };
   }
 };
