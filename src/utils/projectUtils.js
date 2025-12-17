@@ -271,6 +271,14 @@ export const updateTask = async (taskId, updates) => {
  */
 export const deleteTask = async (taskId) => {
   try {
+    // taskIdがundefinedまたはnullの場合はエラー
+    if (taskId === undefined || taskId === null) {
+      console.error('タスク削除エラー: タスクIDが指定されていません');
+      return { data: null, error: new Error('タスクIDが指定されていません') };
+    }
+
+    console.log('タスク削除開始: taskId =', taskId);
+
     const { error } = await supabase
       .from('tasks')
       .delete()
@@ -281,6 +289,7 @@ export const deleteTask = async (taskId) => {
       return { data: null, error };
     }
 
+    console.log('タスク削除成功: taskId =', taskId);
     return { data: { success: true }, error: null };
   } catch (err) {
     console.error('タスク削除エラー:', err);

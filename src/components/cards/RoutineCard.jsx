@@ -80,7 +80,7 @@ const RoutineCardComponent = ({
         <input
           type="checkbox"
           checked={isCompleted}
-          onChange={() => onToggle(routine.id)}
+          onChange={() => onToggle(routine.routineId || routine.id)}
           onClick={(e) => e.stopPropagation()}
           disabled={isSkipped || isInactive}
           className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -165,7 +165,7 @@ const RoutineCardComponent = ({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onSkip(routine.id);
+              onSkip(routine.routineId || routine.id);
             }}
             className={`px-3 py-1 rounded text-xs ${
               darkMode
