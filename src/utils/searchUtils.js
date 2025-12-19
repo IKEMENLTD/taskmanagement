@@ -113,17 +113,41 @@ export const searchTasks = (projects, query, options = {}) => {
  * ルーティンを検索
  */
 export const searchRoutines = (routineTasks, query, options = {}) => {
-  if (!query) return [];
+  if (!query || !routineTasks) return [];
 
   const {
     fuzzy = false,
-    fields = ['title', 'category', 'assignee'],
+    fields = ['name', 'title', 'category', 'assignee'],
     date = null
   } = options;
 
   const matchFn = fuzzy ? fuzzyMatch : simpleMatch;
   const results = [];
 
+  // routineTasksが配列の場合とオブジェクトの場合の両方に対応
+  if (Array.isArray(routineTasks)) {
+    // 配列形式の場合（getTodaysRoutinesからの形式）
+    routineTasks.forEach(routine => {
+      if (!routine) return;
+      let matched = false;
+      for (const field of fields) {
+        if (routine[field] && matchFn(String(routine[field]), query)) {
+          matched = true;
+          break;
+        }
+      }
+
+      if (matched) {
+        results.push({
+          ...routine,
+          date: routine.date || date || new Date().toISOString().split('T')[0]
+        });
+      }
+    });
+    return results;
+  }
+
+  // オブジェクト形式の場合（日付をキーとする形式）
   const dates = date ? [date] : Object.keys(routineTasks);
 
   dates.forEach(dateStr => {
@@ -179,21 +203,39 @@ export const searchTeamMembers = (teamMembers, query, options = {}) => {
 export const globalSearch = (data, query, options = {}) => {
   const { fuzzy = false, includeCompleted = true } = options;
 
-  const results = {
-    projects: searchProjects(data.projects, query, { fuzzy }),
-    tasks: searchTasks(data.projects, query, { fuzzy, includeCompleted }),
-    routines: searchRoutines(data.routineTasks, query, { fuzzy }),
-    teamMembers: searchTeamMembers(data.teamMembers, query, { fuzzy })
+  // エラーハンドリングを追加
+  const safeData = {
+    projects: data?.projects || [],
+    routineTasks: data?.routineTasks || [],
+    teamMembers: data?.teamMembers || []
   };
 
-  // 総件数を計算
-  results.totalCount =
-    results.projects.length +
-    results.tasks.length +
-    results.routines.length +
-    results.teamMembers.length;
+  try {
+    const results = {
+      projects: searchProjects(safeData.projects, query, { fuzzy }),
+      tasks: searchTasks(safeData.projects, query, { fuzzy, includeCompleted }),
+      routines: searchRoutines(safeData.routineTasks, query, { fuzzy }),
+      teamMembers: searchTeamMembers(safeData.teamMembers, query, { fuzzy })
+    };
 
-  return results;
+    // 総件数を計算
+    results.totalCount =
+      results.projects.length +
+      results.tasks.length +
+      results.routines.length +
+      results.teamMembers.length;
+
+    return results;
+  } catch (error) {
+    console.error('検索エラー:', error);
+    return {
+      projects: [],
+      tasks: [],
+      routines: [],
+      teamMembers: [],
+      totalCount: 0
+    };
+  }
 };
 
 /**
